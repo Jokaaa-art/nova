@@ -114,7 +114,7 @@
     automatisations: "Check-in du matin et bilan du soir.", sauvegarde: "Importer et sauvegarder toutes tes données.", fichiers: "Les fichiers gardés dans ton téléphone.", securite: "Ce que N.O.V.A peut faire seule.",
   };
   function vh(id, titre, texte) {
-    return `<header class="vh"><canvas class="mini" id="${id}" aria-hidden="true"></canvas><div><h1>${esc(titre)}</h1><p>${esc(texte || "")}</p></div></header>`;
+    return `<header class="tete"><canvas class="mini" id="${id}" aria-hidden="true"></canvas><div><h1>${esc(titre)}</h1><p>${esc(texte || "")}</p></div></header>`;
   }
   function monterMini(el) { el.querySelectorAll("canvas.mini:not([data-monte])").forEach((c) => { c.dataset.monte = "1"; NovaCoeur.monter(c); }); }
   function entree(el) { el.classList.remove("entre"); void el.offsetWidth; el.classList.add("entre"); }
@@ -510,8 +510,8 @@
   async function rendreModule(m) {
     const el = $("esp-module");
     if (!m) { aller("outils", "", true); return; }
-    let tete = el.querySelector(".vh");
-    if (!tete) { el.insertAdjacentHTML("afterbegin", vh("mini-mod", "", "")); tete = el.querySelector(".vh"); monterMini(el); }
+    let tete = el.querySelector(".tete");
+    if (!tete) { el.insertAdjacentHTML("afterbegin", vh("mini-mod", "", "")); tete = el.querySelector(".tete"); monterMini(el); }
     tete.querySelector("h1").textContent = m.nom; tete.querySelector("p").textContent = INFOS[m.id] || "";
     if (m.tab) { el.querySelectorAll(".panneau").forEach((p) => p.remove()); return; }
     el.querySelectorAll(".panneau").forEach((p) => p.remove());
