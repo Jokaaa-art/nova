@@ -115,6 +115,7 @@ input,textarea,select{font-size:16px!important}
 .interrupteur[aria-checked="true"]::after{transform:translateX(20px)}
 .reglage{display:flex;align-items:center;gap:var(--e-3);padding:12px 0;border-top:1px solid var(--ligne)}
 .reglage:first-of-type{border-top:0}
+.reglage.empile{flex-direction:column;align-items:stretch;gap:var(--e-2)}
 .reglage > div{flex:1;min-width:0}
 .reglage b{display:block;font-weight:600;font-size:15px}
 .reglage span{display:block;font-size:13px;color:var(--texte-2)}
