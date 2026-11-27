@@ -1,13 +1,12 @@
 /* N.O.V.A — service worker : l'appli marche sans Internet, les fichiers « _blob/<id> » viennent du téléphone,
    et une nouvelle version n'est activée que quand Joka touche « Mettre à jour ». */
-const VERSION = "nova-2.0.4";
+const VERSION = "nova-2.1.0";
 const COQUE = [
   "./", "index.html", "manifest.webmanifest",
   "css/v1.css", "css/nova.css",
   "js/store.js", "js/shim.js", "js/coeur.js", "js/cerveau.js", "js/agent.js", "js/sauvegarde.js", "js/evolution.js", "js/shell.js", "js/v1.js",
-  "vendor/jspdf.umd.min.js",
-  "fonts/inter-latin-wght-normal.woff2", "fonts/inter-latin-ext-wght-normal.woff2",
-  "fonts/space-grotesk-latin-wght-normal.woff2", "fonts/space-grotesk-latin-ext-wght-normal.woff2", "fonts/jetbrains-mono-latin-wght-normal.woff2",
+  "vendor/jspdf.umd.min.js", "vendor/core3d.js",
+  "fonts/saira-latin-standard-normal.woff2", "fonts/michroma-latin-400-normal.woff2",
   "icons/icone-192.png", "icons/icone-512.png", "icons/icone-masquable-512.png", "icons/apple-touch-icon.png",
 ];
 

@@ -38,19 +38,24 @@
     reveil: '<path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/><circle cx="12" cy="12" r="3"/>',
     importer: '<path d="M12 15V4m0 0L8 8m4-4 4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>',
     cycle: '<path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v4.5h-4.5"/>',
+    menu: '<line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/>',
   };
   const ic = (n, cls) => `<svg viewBox="0 0 24 24" aria-hidden="true"${cls ? ` class="${cls}"` : ""}>${I[n] || ""}</svg>`;
 
   /* ---------- modules : code v1 (onglets) et panneaux système ---------- */
+  /* les 11 onglets de l'artefact, dans le même ordre, puis les outils système */
   const MODULES = [
     { id: "planning", nom: "Planning", tab: "planning", groupe: "vie", ic: "planning" },
     { id: "budget", nom: "Budget", tab: "budget", groupe: "vie", ic: "budget" },
-    { id: "nutrition", nom: "Nutrition", tab: "nutrition", groupe: "vie", ic: "nutrition" },
-    { id: "sport", nom: "Sport", tab: "sport", groupe: "vie", ic: "sport" },
-    { id: "pesee", nom: "Pesée", tab: "pesee", groupe: "vie", ic: "pesee" },
     { id: "crypto", nom: "Crypto", tab: "crypto", groupe: "vie", ic: "crypto" },
-    { id: "ranger", nom: "À ranger", tab: "ranger", groupe: "vie", ic: "ranger" },
+    { id: "discuter", nom: "Discuter", tab: "nova", groupe: "vie", ic: "chat", vers: ["chat"] },
+    { id: "nutrition", nom: "Nutrition", tab: "nutrition", groupe: "vie", ic: "nutrition" },
+    { id: "pesee", nom: "Pesée", tab: "pesee", groupe: "vie", ic: "pesee" },
+    { id: "sport", nom: "Sport", tab: "sport", groupe: "vie", ic: "sport" },
     { id: "docs", nom: "Documents", tab: "docs", groupe: "vie", ic: "docs" },
+    { id: "ranger", nom: "À ranger", tab: "ranger", groupe: "vie", ic: "ranger" },
+    { id: "memoire", nom: "Mémoire", tab: "memoire", groupe: "vie", ic: "memoire", vers: ["memoire", "sait"] },
+    { id: "reglages", nom: "Réglages", tab: "reglages", groupe: "vie", ic: "reglages" },
     { id: "cerveau", nom: "Cerveau", groupe: "sys", ic: "cerveau" },
     { id: "web", nom: "Recherche web", groupe: "sys", ic: "web" },
     { id: "voix", nom: "Voix et affichage", groupe: "sys", ic: "voix" },
@@ -59,8 +64,9 @@
     { id: "sauvegarde", nom: "Sauvegarde", groupe: "sys", ic: "sauvegarde" },
     { id: "fichiers", nom: "Fichiers", groupe: "sys", ic: "fichiers" },
     { id: "securite", nom: "Sécurité", groupe: "sys", ic: "securite" },
-    { id: "reglages", nom: "Limites du planning", tab: "reglages", groupe: "sys", ic: "reglages" },
   ];
+  const ONGLETS = () => MODULES.filter((m) => m.groupe === "vie");
+  function ouvrirModule(id) { const m = MOD[id]; if (!m) return; if (m.vers) aller(m.vers[0], m.vers[1]); else aller("outils", m.id); }
   const MOD = Object.fromEntries(MODULES.map((m) => [m.id, m]));
   const ESPACES = [["accueil", "Accueil"], ["chat", "Chat"], ["memoire", "Mémoire"], ["labo", "Labo"], ["outils", "Outils"]];
 
@@ -95,15 +101,34 @@
     return null;
   }
   let derniereVue = "";
+  /* barre du bas : Accueil, Chat, Planning, Budget, Plus (comme ORACLE) */
+  const BAS = [["accueil", "Accueil", "accueil"], ["chat", "Chat", "chat"], ["planning", "Planning", "planning"], ["budget", "Budget", "budget"], ["plus", "Plus", "menu"]];
+  function basActif(r) { if (r.espace === "accueil") return "accueil"; if (r.espace === "chat") return "chat"; if (r.espace === "outils" && (r.sous === "planning" || r.sous === "budget")) return r.sous; return "plus"; }
+  const INFOS = {
+    chat: ["Discuter", "Écris ou parle : N.O.V.A te répond ici."], memoire: ["Mémoire", "Ce qu'elle sait de toi, d'où ça vient, ce que tu peux changer."],
+    labo: ["Labo", "Comment N.O.V.A s'améliore : mesuré, réversible, et c'est toi qui valides."], outils: ["Outils", "Tous tes onglets et les réglages de N.O.V.A."],
+    planning: "Ta semaine, tes créneaux et tes limites.", budget: "Ce que tu peux encore dépenser, tes relevés, ton plan.", crypto: "Apprendre, comparer, simuler. Jamais d'achat réel.",
+    nutrition: "Ce que tu manges, tes calories et tes recettes.", pesee: "Ta courbe de poids et ta tendance.", sport: "Tes séances et ce qu'elles brûlent.",
+    docs: "Les documents que tu donnes à N.O.V.A.", ranger: "Ce que N.O.V.A te propose de ranger, à valider.", reglages: "Tes limites de la semaine et l'export.",
+    cerveau: "Le cerveau en ligne gratuit de N.O.V.A.", web: "Chercher une info sur le web.", voix: "Parler à N.O.V.A et l'entendre.", notifications: "Tes rappels, même appli fermée.",
+    automatisations: "Check-in du matin et bilan du soir.", sauvegarde: "Importer et sauvegarder toutes tes données.", fichiers: "Les fichiers gardés dans ton téléphone.", securite: "Ce que N.O.V.A peut faire seule.",
+  };
+  function vh(id, titre, texte) {
+    return `<header class="vh"><canvas class="mini" id="${id}" aria-hidden="true"></canvas><div><h1>${esc(titre)}</h1><p>${esc(texte || "")}</p></div></header>`;
+  }
+  function monterMini(el) { el.querySelectorAll("canvas.mini:not([data-monte])").forEach((c) => { c.dataset.monte = "1"; NovaCoeur.monter(c); }); }
+  function entree(el) { el.classList.remove("entre"); void el.offsetWidth; el.classList.add("entre"); }
   function afficher() {
     const r = (E.route = lireRoute());
     const tab = tabVoulu(r);
     const vue = r.espace === "outils" && r.sous ? "module" : r.espace;
+    fermerPlus();
+    document.body.dataset.vue = vue;
     document.querySelectorAll(".espace").forEach((s) => (s.hidden = s.id !== "esp-" + vue));
-    document.querySelectorAll(".onglet").forEach((b) => b.setAttribute("aria-current", b.dataset.espace === r.espace ? "page" : "false"));
-    const barre = $("barre"); const mod = r.espace === "outils" && r.sous ? MOD[r.sous] : null;
-    if (mod) barre.setAttribute("data-module", mod.id); else barre.removeAttribute("data-module");
-    $("barre-titre").textContent = mod ? mod.nom : "";
+    const actif = basActif(r);
+    document.querySelectorAll("#tabbar button").forEach((b) => b.setAttribute("aria-current", b.dataset.bas === actif ? "page" : "false"));
+    $("convo").hidden = vue !== "accueil";
+    const mod = r.espace === "outils" && r.sous ? MOD[r.sous] : null;
     /* le code v1 se déplace là où on en a besoin */
     const hote = $("v1hote");
     if (tab) {
@@ -115,15 +140,14 @@
     } else { hote.hidden = true; $("v1parking").appendChild(hote); }
     const cle = vue + ":" + (r.sous || "");
     if (cle !== derniereVue) {
-      derniereVue = cle; window.scrollTo(0, 0);
+      derniereVue = cle; window.scrollTo(0, 0); entree($("esp-" + vue));
       if (window.NovaEvolution) NovaEvolution.usage(mod ? "module:" + mod.id : "espace:" + r.espace);
     }
-    if (vue === "accueil") rendreAccueil();
+    if (vue === "accueil") { rendreAccueil(); requestAnimationFrame(() => NovaCoeur.relayout && NovaCoeur.relayout()); }
     else if (vue === "memoire") rendreMemoire();
     else if (vue === "labo") rendreLabo();
     else if (vue === "outils") rendreOutils();
     else if (vue === "module") rendreModule(mod);
-    if (r.espace === "chat") { const ta = document.getElementById("input"); if (ta && matchMedia("(hover: hover)").matches) ta.focus(); }
   }
   /* si le code v1 change d'onglet tout seul (ex. « Demander à N.O.V.A »), la coque suit */
   function suivreV1() {
@@ -132,73 +156,124 @@
     if (!voulu || t === voulu) return;
     if (t === "nova") aller("chat");
     else if (t === "memoire") aller("memoire", "sait");
-    else if (t === "docs") aller("memoire", "docs");
-    else { const m = MODULES.find((x) => x.tab === t); if (m) aller("outils", m.id); }
+    else { const m = MODULES.find((x) => x.tab === t && !x.vers); if (m) aller("outils", m.id); }
   }
 
-  /* ---------- barre du haut ---------- */
-  function majBarre() {
-    const a = window.NovaCoeur ? NovaCoeur.actuel() : { nom: "", phrase: "" };
-    const v = V1(); let txt = a.etat === "veille" && v ? v.ligneEtat() : a.phrase;
-    $("barre-etat").textContent = txt || a.nom;
-    const hors = navigator.onLine === false; const r = $("reseau");
-    r.dataset.hors = hors ? "1" : "0"; r.innerHTML = ic(hors ? "horsligne" : "reseau") + `<span>${hors ? "Hors ligne" : ""}</span>`;
-    r.setAttribute("aria-label", hors ? "Hors connexion" : "Connecté");
+  /* ---------- feuille « Plus » : tous les onglets ---------- */
+  function construirePlus() {
+    const btn = (id, nom, icone, extra) => `<button type="button" data-plus="${id}">${ic(icone)}<span>${esc(nom)}</span>${extra || ""}</button>`;
+    $("plus").innerHTML = `<h2>Tes onglets</h2><div class="grid3">${ONGLETS().map((m) => btn(m.id, m.nom, m.ic, m.id === "ranger" ? `<span class="badge" data-compte="ranger" hidden></span>` : "")).join("")}</div>
+      <h2>N.O.V.A</h2><div class="grid3">${btn("x-memoire", "Mémoire réseau", "memoire")}${btn("x-labo", "Labo", "labo", `<span class="badge" data-compte="labo" hidden></span>`)}${MODULES.filter((m) => m.groupe === "sys").map((m) => btn(m.id, m.nom, m.ic)).join("")}</div>`;
+    $("plus").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-plus]"); if (!b) return;
+      const id = b.dataset.plus;
+      if (id === "x-memoire") aller("memoire"); else if (id === "x-labo") aller("labo"); else ouvrirModule(id);
+    });
+  }
+  function ouvrirPlus() { $("plus").classList.add("ouvert"); $("voile").classList.add("ouvert"); document.querySelector('#tabbar [data-bas="plus"]').setAttribute("aria-expanded", "true"); }
+  function fermerPlus() { $("plus").classList.remove("ouvert"); $("voile").classList.remove("ouvert"); const b = document.querySelector('#tabbar [data-bas="plus"]'); if (b) b.setAttribute("aria-expanded", "false"); }
+
+  /* ---------- barre du haut : pastille d'état (comme ORACLE) ---------- */
+  async function majBarre() {
+    const a = window.NovaCoeur ? NovaCoeur.actuel() : { etat: "veille", nom: "", phrase: "" };
+    const et = window.NovaCerveau ? await NovaCerveau.etatTexte() : { code: "cle" };
+    let dot = "idle", txt = "À brancher";
+    if (navigator.onLine === false) { dot = "att"; txt = "Hors ligne"; }
+    else if (["reflexion", "recherche", "reponse", "ecoute"].includes(a.etat)) { dot = "work"; txt = a.nom; }
+    else if (a.etat === "erreur") { dot = "bad"; txt = "Erreur"; }
+    else if (et.code === "ok") { dot = "ok"; txt = "En ligne"; }
+    else if (et.code === "autorisation") { dot = "att"; txt = "À autoriser"; }
+    $("pill-dot").className = "dot " + dot; $("pill-text").textContent = txt;
+    const st = $("st-label"); if (st) st.textContent = a.nom;
+    const ph = $("phrase-etat"); if (ph) { const v = V1(); ph.textContent = a.etat === "veille" && v ? v.ligneEtat() : a.phrase; }
   }
 
-  /* ---------- ACCUEIL : centre de commande ---------- */
+  /* ---------- ACCUEIL : noyau + tableau de bord de tous les onglets ---------- */
   const bonjour = () => { const h = NovaAgent.partsParis().h; return h < 5 ? "Bonne nuit" : h < 12 ? "Bonjour" : h < 18 ? "Bon après-midi" : "Bonsoir"; };
   const quand = (ts) => { if (!ts) return "jamais"; const d = Date.now() - ts; if (d < 60000) return "à l'instant"; if (d < 3600e3) return "il y a " + Math.round(d / 60000) + " min"; if (d < 864e5) return "il y a " + Math.round(d / 3600e3) + " h"; return "il y a " + Math.round(d / 864e5) + " j"; };
   const heureCourte = (ts) => new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" }).format(new Date(ts));
   const octets = (n) => n > 1048576 ? (n / 1048576).toFixed(1).replace(".", ",") + " Mo" : Math.max(1, Math.round(n / 1024)) + " ko";
+  const hfmt = (x) => { if (x == null || !isFinite(x)) return "—"; const h = Math.floor(x + 1e-9), m = Math.round((x - h) * 60); return m ? `${h} h ${String(m).padStart(2, "0")}` : `${h} h`; };
+  const nb = (x, d) => (x == null || !isFinite(x)) ? "—" : new Intl.NumberFormat("fr-FR", { maximumFractionDigits: d || 0, minimumFractionDigits: d || 0 }).format(x);
+  const euros = (x) => (x == null || !isFinite(x)) ? "—" : (V1() && V1().eur ? V1().eur(x) : nb(x) + " €");
+  const pct = (a, b) => (b > 0 ? Math.max(0, Math.min(100, (a / b) * 100)) : 0);
 
   async function rendreAccueil() {
     const el = $("esp-accueil");
     if (!el.dataset.monte) {
       el.dataset.monte = "1";
       el.innerHTML = `
-        <div class="salut"><span id="acc-date"></span><b id="acc-salut">Bonjour Joka</b></div>
-        <div class="noyau-zone">
-          <canvas id="noyau" role="button" tabindex="0" aria-label="Noyau de N.O.V.A : touche pour parler"></canvas>
-          <p class="etat-nom" id="noyau-nom" aria-live="polite"></p>
-          <p class="etat-phrase" id="noyau-phrase"></p>
-        </div>
-        <div class="hud" id="acc-hud" aria-label="État du système"></div>
+        <section class="core" id="core" aria-label="Noyau de N.O.V.A">
+          <canvas id="coreCv" aria-hidden="true"></canvas>
+          <canvas id="core3d" aria-hidden="true"></canvas>
+          <button class="noyau-touche" id="noyau-touche" type="button" aria-label="Toucher le noyau pour parler à N.O.V.A"></button>
+          <div class="mark"><h1 class="w">N.O.V.A</h1><div class="s">AGENT DE VIE</div><div class="st"><i class="dot"></i><span id="st-label">En veille</span></div></div>
+        </section>
+        <p class="phrase-etat" id="phrase-etat" aria-live="polite"></p>
         <div id="acc-bienvenue"></div>
-        <div class="actions-rapides">
-          <button class="action-rapide" data-act="chat">${ic("chat")}<span>Discuter<small>Écrire à N.O.V.A</small></span></button>
-          <button class="action-rapide" data-act="reveil">${ic("reveil")}<span>Réveiller<small>Faire le point</small></span></button>
-          <button class="action-rapide" data-act="planning">${ic("planning")}<span>Ma journée<small id="acc-jour">Planning</small></span></button>
-          <button class="action-rapide" data-act="budget">${ic("budget")}<span>Budget<small>Où j'en suis</small></span></button>
-        </div>
-        <section class="carte" aria-labelledby="acc-sys-t"><h2 id="acc-sys-t">Système</h2><div id="acc-sys"><div class="squelette"></div></div></section>
-        <section class="carte" aria-labelledby="acc-tt-t"><h2 id="acc-tt-t">À traiter</h2><div id="acc-traiter" class="liste"><div class="squelette"></div></div></section>
-        <section class="carte" aria-labelledby="acc-op-t"><h2 id="acc-op-t">Dernières opérations</h2><div id="acc-ops" class="liste"><div class="squelette"></div></div></section>`;
-      NovaCoeur.monter($("noyau"));
-      const toucher = () => parler();
-      $("noyau").addEventListener("click", toucher);
-      $("noyau").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toucher(); } });
+        <section class="panel" style="--i:1" aria-labelledby="acc-db-t"><div class="in"><div class="ph">${ic("accueil")}<h2 id="acc-db-t">Tableau de bord</h2><span class="meta" id="acc-date"></span></div><div class="dash" id="dash"></div></div></section>
+        <section class="panel" style="--i:2" aria-labelledby="acc-tt-t"><div class="in"><div class="ph">${ic("ranger")}<h2 id="acc-tt-t">À traiter</h2><button class="btn ghost" style="margin-left:auto;min-height:36px" data-act="reveil">Réveiller N.O.V.A</button></div><div id="acc-traiter" class="liste"><div class="squelette"></div></div></div></section>
+        <section class="panel" style="--i:3" aria-labelledby="acc-op-t"><div class="in"><div class="ph">${ic("auto")}<h2 id="acc-op-t">Activités de N.O.V.A</h2></div><div id="acc-ops" class="liste"><div class="squelette"></div></div></div></section>
+        <section class="panel" style="--i:4" aria-labelledby="acc-sys-t"><div class="in"><div class="ph">${ic("cerveau")}<h2 id="acc-sys-t">Système</h2></div><div id="acc-sys"><div class="squelette"></div></div></div></section>`;
+      NovaCoeur.monterHub($("core"), $("coreCv"), $("core3d"), el.querySelector(".mark"));
+      $("noyau-touche").addEventListener("click", () => parler());
       el.addEventListener("click", (e) => {
+        const o = e.target.closest("[data-ouvrir]"); if (o) { ouvrirModule(o.dataset.ouvrir); return; }
         const b = e.target.closest("[data-act]"); if (!b) return;
         const a = b.dataset.act;
-        if (a === "chat") aller("chat");
-        else if (a === "reveil") { if (V1()) V1().reveiller("Joka a appuyé sur « Réveiller N.O.V.A » : fais le point avec lui (une ligne si rien de neuf), vérifie le rythme.", true); aller("chat"); }
-        else if (a === "planning") aller("outils", "planning");
-        else if (a === "budget") aller("outils", "budget");
+        if (a === "reveil") { if (V1()) V1().reveiller("Joka a appuyé sur « Réveiller N.O.V.A » : fais le point avec lui (une ligne si rien de neuf), vérifie le rythme.", true); aller("chat"); }
         else if (a === "importer") aller("outils", "sauvegarde");
         else if (a === "cerveau") aller("outils", "cerveau");
         else if (a === "ntfy") aller("outils", "notifications");
         else if (a === "ranger") aller("outils", "ranger");
+        else if (a === "planning") aller("outils", "planning");
         else if (a === "labo") aller("labo");
         else if (a === "attente") { NovaAgent.rejouer(true).then((n) => toast(n ? n + " demande(s) reprise(s)." : "Pas de cerveau disponible pour l'instant.")); }
         else if (a === "installer") toast("Dans Safari : touche Partager, puis « Sur l'écran d'accueil ».");
       });
     }
-    const a = NovaCoeur.actuel();
-    $("noyau-nom").textContent = a.nom; $("noyau-phrase").textContent = a.phrase;
-    $("acc-salut").textContent = bonjour() + " Joka";
-    $("acc-date").textContent = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", weekday: "long", day: "numeric", month: "long" }).format(new Date());
+    $("acc-date").textContent = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", weekday: "short", day: "numeric", month: "short" }).format(new Date());
+    majBarre();
+    rendreDash();
     await Promise.all([accSysteme(), accTraiter(), accOps(), accBienvenue()]);
+  }
+  function tuile(id, icone, titre, corps, opts) {
+    opts = opts || {};
+    return `<button class="dash-t${opts.large ? " large" : ""}" data-ouvrir="${id}" style="--i:${opts.i || 0}"><span><span class="h">${ic(icone)}${esc(titre)}${opts.n ? `<span class="n">${esc(opts.n)}</span>` : ""}</span>${corps}</span></button>`;
+  }
+  function rendreDash() {
+    const v = V1(); const d = $("dash"); if (!d) return;
+    if (!v || !v.resume) { d.innerHTML = `<div class="squelette"></div>`; return; }
+    const R = v.resume(); const t = [];
+    const pl = R.planning;
+    if (pl) {
+      const auj = pl.auj.slice(0, 4).map((b) => `<div><time>${hfmt(b.start).replace(" ", "")}–${hfmt(b.end).replace(" ", "")}</time><span>${esc(b.label)}${b.note ? ", " + esc(b.note) : ""}</span></div>`).join("");
+      t.push(tuile("planning", "planning", "Planning", `${auj ? `<span class="creneaux">${auj}</span>` : `<b class="petit">Rien de prévu aujourd'hui</b>`}
+        <small${pl.alertes.length ? ' class="att"' : ""}>${pl.alertes.length ? esc(pl.alertes[0]) : `Stream ${hfmt(pl.stream)} sur ${pl.streamMax} h cette semaine`}</small>
+        <span class="prog${pl.stream > pl.streamMax ? " att" : ""}"><i style="width:${pct(pl.stream, pl.streamMax)}%"></i></span>`, { large: true, n: pl.alertes.length || "" }));
+    }
+    const bu = R.budget;
+    if (bu) {
+      if (!bu.nTx) t.push(tuile("budget", "budget", "Budget", `<b class="petit">Pas encore de relevé</b><small>Importe un relevé pour voir où tu en es.</small>`));
+      else t.push(tuile("budget", "budget", "Budget", `<b>${esc(euros(bu.reste))}</b><small${bu.reste < 0 ? ' class="err"' : ""}>${bu.reste < 0 ? "dépassé" : "à dépenser"} cette semaine, sur ${esc(euros(bu.autorise))}</small>${bu.joint ? `<small class="att">Compte joint : il manque ${esc(euros(bu.joint.manque))}</small>` : ""}<span class="prog${bu.reste < 0 ? " att" : ""}"><i style="width:${pct(bu.depense, bu.autorise)}%"></i></span>`));
+    }
+    const ch = R.chat;
+    t.push(tuile("discuter", "chat", "Discuter", ch ? `<small>${ch.role === "joka" ? "Toi" : "N.O.V.A"}, ${esc(quand(ch.ts))}</small><b class="petit">${esc(ch.text.slice(0, 90))}${ch.text.length > 90 ? "…" : ""}</b>` : `<b class="petit">Dis-lui bonjour</b><small>Elle te répond ici.</small>`));
+    const nu = R.nutrition;
+    if (nu) t.push(tuile("nutrition", "nutrition", "Nutrition", `<b>${nb(nu.kcal)} kcal</b><small>${nu.cible ? "sur " + nb(nu.cible) + " aujourd'hui" : "aujourd'hui"}, ${nu.repas} repas</small>${nu.cible ? `<span class="prog${nu.kcal > nu.cible ? " att" : ""}"><i style="width:${pct(nu.kcal, nu.cible)}%"></i></span>` : ""}`));
+    const sp = R.sport;
+    if (sp) t.push(tuile("sport", "sport", "Sport", `<b>${nb(sp.min)} min</b><small>aujourd'hui, ${sp.semaine} séance${sp.semaine > 1 ? "s" : ""} sur 7 jours</small>`));
+    const pz = R.pesee;
+    if (pz) t.push(tuile("pesee", "pesee", "Pesée", pz.kg ? `<b>${nb(pz.kg, 1)} kg</b><small>${pz.tendance ? "tendance " + nb(pz.tendance, 1) + " kg" : ""}${pz.rythme != null ? (pz.tendance ? ", " : "") + (pz.rythme > 0 ? "+" : "") + nb(pz.rythme, 2) + " kg/sem" : ""}${pz.objectif ? ", objectif " + nb(pz.objectif, 1) + " kg" : ""}</small>` : `<b class="petit">Pas encore de pesée</b>`));
+    const cr = R.crypto;
+    if (cr) t.push(tuile("crypto", "crypto", "Crypto", `<b>${cr.ouvertes} en cours</b><small>simulation${cr.fermees ? ", " + cr.fermees + " clôturée" + (cr.fermees > 1 ? "s" : "") : ""}${cr.comparatif ? ", comparatif du " + esc(cr.comparatif) : ""}</small>`));
+    t.push(tuile("docs", "docs", "Documents", `<b>${R.docs.aLire ? R.docs.aLire + " à lire" : R.docs.total + " rangé" + (R.docs.total > 1 ? "s" : "")}</b><small>${R.docs.total} document${R.docs.total > 1 ? "s" : ""} donnés à N.O.V.A</small>`, { n: R.docs.aLire || "" }));
+    t.push(tuile("ranger", "ranger", "À ranger", `<b>${R.ranger.n ? R.ranger.n + " à valider" : "Rien"}</b><small>${R.ranger.n ? "N.O.V.A attend ton accord" : "Tout est rangé"}</small>`, { n: R.ranger.n || "" }));
+    const me = R.memoire;
+    t.push(tuile("memoire", "memoire", "Mémoire", `<b>${me.savoirs} savoir${me.savoirs > 1 ? "s" : ""}</b><small>${me.maj ? "mise à jour " + esc(quand(me.maj)) : "pas encore remplie"}${me.journal ? ", journal du " + esc(me.journal.date) : ""}</small>`));
+    t.push(tuile("reglages", "reglages", "Réglages", `<b class="petit">Tes limites</b><small>${pl ? "Stream " + pl.streamMax + " h, Entreprise " + pl.proMax + " h par semaine" : "Limites et export"}</small>`));
+    d.innerHTML = t.map((x, i) => x.replace(/style="--i:\d+"/, `style="--i:${i}"`)).join("");
+    majCompteurs();
   }
   async function accBienvenue() {
     const n = S.compter(B), c = await NovaCerveau.config(), nt = await NovaNtfy.config();
@@ -206,22 +281,18 @@
     if (n < 5) etapes.push(["importer", "Importer tes données", "Le fichier NOVA-donnees de l'app Fichiers."]);
     if (!c.autorise || !Object.values(c.cles).some(Boolean)) etapes.push(["cerveau", "Activer mon cerveau", "Une clé gratuite, gardée dans ton téléphone."]);
     if (!nt.actif) etapes.push(["ntfy", "Activer les rappels", "Check-in et bilan, même appli fermée."]);
-    if (!navigator.standalone && !matchMedia("(display-mode: standalone)").matches) etapes.push(["installer", "M'installer sur l'écran d'accueil", "Safari → Partager → Sur l'écran d'accueil."]);
-    $("acc-bienvenue").innerHTML = etapes.length ? `<section class="carte"><h2>Pour finir de m'installer</h2><div class="liste">${etapes.map(([k, t, s]) => `<div class="el"><div class="t"><b>${esc(t)}</b><small>${esc(s)}</small></div><button class="btn${k === etapes[0][0] ? " principal" : ""}" data-act="${k}">${k === "installer" ? "Comment" : "Ouvrir"}</button></div>`).join("")}</div></section>` : "";
+    if (!navigator.standalone && !matchMedia("(display-mode: standalone)").matches) etapes.push(["installer", "M'installer sur l'écran d'accueil", "Safari, Partager, Sur l'écran d'accueil."]);
+    $("acc-bienvenue").innerHTML = etapes.length ? `<section class="panel"><div class="in"><div class="ph">${ic("cycle")}<h2>Pour finir de m'installer</h2></div><div class="liste">${etapes.map(([k, t, s], i) => `<div class="el"><div class="t"><b>${esc(t)}</b><small>${esc(s)}</small></div><button class="btn${i ? " ghost" : ""}" data-act="${k}">${k === "installer" ? "Comment" : "Ouvrir"}</button></div>`).join("")}</div></div></section>` : "";
   }
   async function accSysteme() {
     const et = await NovaCerveau.etatTexte(); const sto = await S.stockage(); const exp = await S.kvLire("export_dernier");
-    const n = S.compter(B); const nova = (await S.doc(B + "nova").get()).data() || {};
+    const n = S.compter(B);
     const lignes = [
-      ["Moteur IA", et.texte, et.code === "ok" ? "ok" : "att"],
+      ["Cerveau", et.texte, et.code === "ok" ? "ok" : "att"],
       ["Mémoire locale", n + " éléments, " + octets(sto.utilise || 0), n ? "ok" : "att"],
       ["Connexion", navigator.onLine === false ? "Hors ligne" : "En ligne", navigator.onLine === false ? "att" : "ok"],
-      ["Mode", et.code === "ok" ? "Local + cerveau en ligne" : "Local seulement", ""],
       ["Sauvegarde", exp ? quand(exp.at) : "jamais faite", exp && Date.now() - exp.at < 7 * 864e5 ? "ok" : "att"],
-      ["Prochain rendez-vous", (nova.nextRitual && nova.nextRitual.label) || "—", ""],
     ];
-    $("acc-hud").innerHTML = [["Cerveau", et.code === "ok" ? "Actif" : et.code === "horsligne" ? "Hors ligne" : "En attente", et.code === "ok" ? "ok" : "att"], ["Mémoire", String(n), n ? "ok" : "att"], ["Réseau", navigator.onLine === false ? "Coupé" : "En ligne", navigator.onLine === false ? "att" : "ok"]]
-      .map(([k, v, s]) => `<div class="hud-cell"><span>${esc(k)}</span><b data-etat="${s}">${esc(v)}</b></div>`).join("");
     $("acc-sys").innerHTML = lignes.map(([k, v, s]) => `<div class="ligne-kv"><span class="k">${esc(k)}</span><span class="v"${s ? ` data-etat="${s}"` : ""}>${esc(v)}</span></div>`).join("");
   }
   async function accTraiter() {
@@ -232,11 +303,11 @@
     }
     const fa = await NovaAgent.attente(); if (fa.length) items.push(["attente", fa.length + " demande(s) gardée(s) pour plus tard", "Reprendre"]);
     const ev = await NovaEvolution.etat(); if (ev.propositions.length) items.push(["labo", ev.propositions.length + " amélioration(s) à valider", "Voir"]);
-    $("acc-traiter").innerHTML = items.length ? items.map(([a, t, b]) => `<div class="el"><div class="t"><b>${esc(t)}</b></div><button class="btn" data-act="${a}">${esc(b)}</button></div>`).join("") : `<p class="vide">Rien d'urgent. Tout est à jour.</p>`;
+    $("acc-traiter").innerHTML = items.length ? items.map(([a, t, b]) => `<div class="el"><div class="t"><b>${esc(t)}</b></div><button class="btn ghost" data-act="${a}">${esc(b)}</button></div>`).join("") : `<p class="vide">Rien d'urgent. Tout est à jour.</p>`;
   }
   async function accOps() {
-    const l = await NovaJournal.derniers(6);
-    $("acc-ops").innerHTML = l.length ? l.map((o) => `<div class="el"><div class="t"><b>${esc(o.texte)}</b></div><time class="mono" datetime="${new Date(o.ts).toISOString()}">${heureCourte(o.ts)}</time></div>`).join("") : `<p class="vide">Aucune opération pour l'instant. Elles s'afficheront ici, avec leur heure.</p>`;
+    const l = await NovaJournal.derniers(5);
+    $("acc-ops").innerHTML = l.length ? l.map((o) => `<div class="el"><div class="t"><b>${esc(o.texte)}</b></div><time class="mono" datetime="${new Date(o.ts).toISOString()}">${heureCourte(o.ts)}</time></div>`).join("") : `<p class="vide">Aucune activité pour l'instant. Elles s'afficheront ici, avec leur heure.</p>`;
   }
 
   /* ---------- VOIX : écouter (Safari) et lire à voix haute ---------- */
@@ -320,7 +391,7 @@
     const el = $("esp-memoire");
     if (!el.dataset.monte) {
       el.dataset.monte = "1";
-      el.innerHTML = `<div class="titre-espace"><div><h1>Mémoire</h1><p>Ce que N.O.V.A sait de toi, d'où ça vient, et ce que tu peux changer.</p></div></div>
+      el.innerHTML = `${vh("mini-mem", INFOS.memoire[0], INFOS.memoire[1])}
         <div class="segment" role="group" aria-label="Vue de la mémoire"><button data-seg="reseau">Réseau</button><button data-seg="sait">Ce qu'elle sait</button><button data-seg="docs">Documents</button></div>
         <div id="mem-reseau"></div><div id="mem-v1"></div>`;
       el.addEventListener("click", (e) => {
@@ -331,6 +402,7 @@
       el.addEventListener("keydown", (e) => { const n = e.target.closest("[data-cat]"); if (n && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); n.dispatchEvent(new MouseEvent("click", { bubbles: true })); } });
       el.addEventListener("input", (e) => { if (e.target.id === "mem-q") { E.memRecherche = e.target.value; rendreListeMemoire(); } });
     }
+    monterMini(el);
     const seg = E.route.sous || "reseau";
     el.querySelectorAll("[data-seg]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.seg === seg)));
     $("mem-reseau").hidden = seg !== "reseau"; $("mem-v1").hidden = seg === "reseau";
@@ -388,7 +460,7 @@
     const annules = ev.historique.filter((h) => h.statut === "annulé").length;
     const tests = ev.historique.filter((h) => h.statut === "en test").length;
     const statut = { "en test": "En test", "validé": "Gardé", "appliqué": "Appliqué", "annulé": "Annulé", "refusé": "Refusé", "échec": "Échec" };
-    el.innerHTML = `<div class="titre-espace"><div><h1>Labo</h1><p>Comment N.O.V.A s'améliore : mesuré, réversible, et toi qui décides de ce qui compte.</p></div></div>
+    el.innerHTML = `${vh("mini-labo", INFOS.labo[0], INFOS.labo[1])}
       <section class="carte"><h2>Cycle d'évolution</h2><div class="cycle" id="lab-cycle">${NovaEvolution.ETAPES.map((x, i) => `<span class="etape" data-i="${i}">${x}</span>`).join("")}</div>
         <p class="sous" style="margin-top:var(--e-3)">${ev.dernier ? "Dernier cycle " + quand(ev.dernier) + "." : "Aucun cycle encore."} Il tourne seul toutes les 30 min quand l'appli est ouverte.</p>
         <div class="rangee" style="margin-top:var(--e-3)"><button class="btn principal" data-lab="cycle">${ic("cycle")}Lancer un cycle</button></div></section>
@@ -397,7 +469,7 @@
       <section class="carte"><h2>Ce que j'ai appris</h2>${ev.apprentissages.length ? `<div class="liste">${ev.apprentissages.slice().reverse().slice(0, 10).map((a) => `<div class="el"><div class="t"><b>${esc(a.texte)}</b></div><time class="mono">${new Date(a.at).toLocaleDateString("fr-FR")}</time></div>`).join("")}</div>` : `<p class="vide">Rien encore : j'apprends en te regardant utiliser l'appli.</p>`}</section>
       <section class="carte"><h2>Changements</h2>${ev.historique.length ? `<div class="liste">${ev.historique.slice().reverse().slice(0, 15).map((h) => `<div class="el"><div class="t"><b>${esc(h.titre)}</b><small>${esc(statut[h.statut] || h.statut)}${h.niveau ? " (" + esc((NovaEvolution.NIVEAUX[h.niveau] || "").toLowerCase()) + ")" : ""}</small>${h.verdict ? `<small>${esc(h.verdict)}</small>` : ""}</div>${(h.statut === "validé" || h.statut === "appliqué" || h.statut === "en test") && /cerveau_ordre|cerveau_reglages|interface/.test(h.cat) ? `<button class="btn" data-lab="annuler" data-at="${h.at}">Annuler</button>` : ""}</div>`).join("")}</div>` : `<p class="vide">Aucun changement pour l'instant.</p>`}</section>
       <section class="carte"><h2>Cerveaux en ligne</h2>${Object.keys(st).length ? Object.entries(st).map(([f, x]) => { const r = x.recents || []; const ok = r.filter((y) => y.ok).length; return `<div class="ligne-kv"><span class="k">${esc((NovaCerveau.FOURNISSEURS[f] || {}).nom || f)}</span><span class="v">${r.length ? Math.round(ok / r.length * 100) + " %, " + (x.ms || "?") + " ms" : "pas mesuré"}</span></div>`; }).join("") : `<p class="vide">Pas encore d'appel mesuré.</p>`}</section>`;
-    majCycle();
+    monterMini(el); majCycle();
   }
   function majCycle() {
     const i = NovaEvolution.etape(); const c = $("lab-cycle"); if (!c) return;
@@ -422,21 +494,25 @@
   }
   async function rendreOutils() {
     const el = $("esp-outils");
-    if (!el.dataset.monte) { el.dataset.monte = "1"; el.addEventListener("click", (e) => { const b = e.target.closest("[data-mod]"); if (b) aller("outils", b.dataset.mod); }); }
+    if (!el.dataset.monte) { el.dataset.monte = "1"; el.addEventListener("click", (e) => { const b = e.target.closest("[data-mod]"); if (b) ouvrirModule(b.dataset.mod); }); }
     const ev = await NovaEvolution.etat(); const ordre = (ev.reglages && ev.reglages.ordreOutils) || [];
     const rang = (m) => { const i = ordre.indexOf(m.id); return i < 0 ? 99 + MODULES.indexOf(m) : i; };
-    const carte = async (m) => { const [e, t] = await etatModule(m); return `<button class="module" data-mod="${m.id}">${ic(m.ic)}<span>${esc(m.nom)}</span><span class="puce" data-etat="${e}">${esc(t)}</span></button>`; };
+    const carte = async (m) => { const [e, t] = await etatModule(m); return `<button class="module" data-mod="${m.id}"><span>${ic(m.ic)}<span>${esc(m.nom)}</span><span class="puce" data-etat="${e}">${esc(t)}</span></span></button>`; };
     const vie = MODULES.filter((m) => m.groupe === "vie").sort((a, b) => rang(a) - rang(b));
     const sys = MODULES.filter((m) => m.groupe === "sys");
-    el.innerHTML = `<div class="titre-espace"><div><h1>Outils</h1><p>Tous les modules de N.O.V.A, avec leur état réel.</p></div></div>
-      <h2 class="groupe-titre">Ta vie</h2><div class="modules">${(await Promise.all(vie.map(carte))).join("")}</div>
+    el.innerHTML = `${vh("mini-outils", INFOS.outils[0], INFOS.outils[1])}
+      <h2 class="groupe-titre">Tes onglets</h2><div class="modules">${(await Promise.all(vie.map(carte))).join("")}</div>
       <h2 class="groupe-titre">Système</h2><div class="modules">${(await Promise.all(sys.map(carte))).join("")}</div>`;
+    monterMini(el);
   }
 
   /* ---------- panneaux système ---------- */
   async function rendreModule(m) {
     const el = $("esp-module");
     if (!m) { aller("outils", "", true); return; }
+    let tete = el.querySelector(".vh");
+    if (!tete) { el.insertAdjacentHTML("afterbegin", vh("mini-mod", "", "")); tete = el.querySelector(".vh"); monterMini(el); }
+    tete.querySelector("h1").textContent = m.nom; tete.querySelector("p").textContent = INFOS[m.id] || "";
     if (m.tab) { el.querySelectorAll(".panneau").forEach((p) => p.remove()); return; }
     el.querySelectorAll(".panneau").forEach((p) => p.remove());
     const p = document.createElement("div"); p.className = "panneau espace"; p.style.animation = "none";
@@ -621,8 +697,11 @@
   /* ---------- compteurs des onglets, rafraîchissements ---------- */
   async function majCompteurs() {
     const ev = await NovaEvolution.etat(); const ar = V1() ? V1().aRanger().length : 0;
-    const set = (k, n) => { const b = document.querySelector(`.onglet[data-espace="${k}"] .compte`); if (b) { b.hidden = !n; b.textContent = n > 9 ? "9+" : String(n); } };
-    set("labo", ev.propositions.length); set("outils", ar);
+    const n = ev.propositions.length;
+    document.querySelectorAll('[data-compte="ranger"]').forEach((c) => { c.hidden = !ar; c.textContent = String(ar); });
+    document.querySelectorAll('[data-compte="labo"]').forEach((c) => { c.hidden = !n; c.textContent = String(n); });
+    const plus = document.querySelector('#tabbar [data-bas="plus"] .badge'); if (plus) { plus.hidden = !(ar + n); plus.textContent = String(ar + n); }
+    $("cloche-dot").hidden = !n;
   }
   let majT = 0;
   function majTout() {
@@ -652,15 +731,26 @@
     try { await chargerScript(url); } finally { URL.revokeObjectURL(url); }
   }
   async function demarrer() {
-    $("onglets").innerHTML = ESPACES.map(([k, t]) => `<button class="onglet" data-espace="${k}" aria-current="false">${ic(k)}<span>${t}</span><span class="compte" hidden></span></button>`).join("");
-    $("onglets").addEventListener("click", (e) => { const b = e.target.closest(".onglet"); if (b) aller(b.dataset.espace); });
-    $("retour").innerHTML = ic("retour") + "Outils"; $("retour").onclick = () => (history.length > 1 && /#outils\//.test(location.hash) ? history.back() : aller("outils"));
-    NovaCoeur.monter($("noyau-mini"), { mini: true });
-    NovaCoeur.ecouter((etat, phrase) => {
-      majBarre();
-      const n = $("noyau-nom"), ph = $("noyau-phrase");
-      if (n) { n.textContent = NovaCoeur.ETATS[etat].nom; ph.textContent = phrase; }
+    $("tabbar").innerHTML = BAS.map(([k, t, icone]) => `<button type="button" data-bas="${k}" aria-current="false"${k === "plus" ? ' aria-haspopup="dialog" aria-expanded="false"' : ""}>${ic(icone)}<span>${t}</span>${k === "plus" ? '<span class="badge" hidden></span>' : ""}</button>`).join("");
+    $("tabbar").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-bas]"); if (!b) return; const k = b.dataset.bas;
+      if (k === "plus") { $("plus").classList.contains("ouvert") ? fermerPlus() : ouvrirPlus(); return; }
+      if (k === "accueil") aller("accueil"); else if (k === "chat") aller("chat"); else aller("outils", k);
     });
+    construirePlus();
+    $("voile").addEventListener("click", fermerPlus);
+    addEventListener("keydown", (e) => { if (e.key === "Escape") fermerPlus(); });
+    $("brand").addEventListener("click", () => aller("accueil"));
+    $("pill").addEventListener("click", () => aller("outils", "cerveau"));
+    $("cloche").addEventListener("click", () => aller("labo"));
+    $("prof").addEventListener("click", () => aller("outils"));
+    $("mic").addEventListener("click", () => parler());
+    $("convo").addEventListener("submit", (e) => {
+      e.preventDefault(); const t = $("convo-in").value.trim(); if (!t) return;
+      $("convo-in").value = ""; $("convo-in").blur(); aller("chat");
+      if (V1()) V1().envoyer(t);
+    });
+    NovaCoeur.ecouter((etat) => { majBarre(); $("mic").setAttribute("aria-pressed", String(etat === "ecoute")); });
     await S.ouvrir();
     if ((await S.kvLire("calme")) === true) document.documentElement.dataset.calme = "1";
     /* le planning (privé) vient du téléphone, jamais du code */
@@ -670,7 +760,11 @@
     try { localStorage.setItem("nova-tab", tabVoulu(E.route) || "nova"); } catch (e) {}
     await chargerV1();
     E.v1pret = !!window.NovaV1;
-    new MutationObserver(() => { suivreV1(); if (E.route.espace === "accueil") majTraiterDiffere(); }).observe($("app"), { childList: true });
+    new MutationObserver(() => {
+      suivreV1(); if (E.route.espace === "accueil") majTraiterDiffere();
+      const nav = document.querySelector("#v1hote nav.tabs"), sel = nav && nav.querySelector('.tab[aria-selected="true"]');
+      if (sel) nav.scrollLeft = sel.offsetLeft - (nav.clientWidth - sel.clientWidth) / 2;
+    }).observe($("app"), { childList: true });
     afficher();
     addEventListener("online", majTout); addEventListener("offline", majTout);
     ["nova:journal", "nova:evolution", "nova:cerveau", "nova:attente"].forEach((ev) => addEventListener(ev, majTout));

@@ -3476,7 +3476,22 @@ function crBind(){
 /* PWA N.O.V.A V2 : la coque de l'appli pilote les onglets et lit l'état (rien d'autre ne change). */
 window.NovaV1={S,render:()=>render(),soft:()=>soft(),setTab:t=>{S.tab=t;try{localStorage.setItem("nova-tab",t)}catch(e){}render()},
   planning:()=>state,limites:()=>limits(),attention:()=>{try{return attention()}catch(e){return []}},aRanger:()=>{try{return arPending()}catch(e){return []}},
-  ligneEtat:()=>{try{return stateLine()}catch(e){return ""}},envoyer:t=>sendMsg(t),reveiller:(t,r)=>wakeNova(t,r),paris:()=>paris(),TYPES,DAYS,REGLES:{DOC_RULES,MR_RULES,CR_RULES,LAB_PROMPT}};
+  ligneEtat:()=>{try{return stateLine()}catch(e){return ""}},
+  /* résumé de chaque onglet pour le tableau de bord de l'Accueil (calculé par le code de la page, rien d'inventé) */
+  resume:()=>{const R={},t=parisDate(),ok=f=>{try{return f()}catch(e){return null}};
+    R.planning=ok(()=>{const T=totals(),L=limits(),j=paris().day;return {auj:state.blocks.filter(b=>b.day===j).sort((a,b)=>a.start-b.start).map(b=>({type:b.type,label:(TYPES[b.type]&&(TYPES[b.type].label))||b.type,start:b.start,end:b.end,note:b.note||""})),stream:T.stream?T.stream.hours:0,streamMax:L.streamWeek,pro:T.mgx.hours,proMax:L.mgxWeek,alertes:attention().map(x=>x[1])}});
+    R.budget=ok(()=>{const C=bcalc(),W=C.semaine||{};return {nTx:C.nTx,reste:W.reste,depense:W.depense,autorise:W.autorise,du:W.du,au:W.au,joint:C.jc&&C.jc.manque>0?{manque:C.jc.manque}:null}});
+    R.nutrition=ok(()=>{const c=cibles((S.nutri&&S.nutri.profile)||null),d=dayTotals(t);return {kcal:d.kcal,cible:c?c.kcal:null,repas:d.n,p:d.p}});
+    R.sport=ok(()=>{const sp=seDayTot(t),n=bdnum(t),sem=S.seances.filter(x=>x.date&&bdnum(x.date)>n-7&&bdnum(x.date)<=n);return {kcal:sp.kcal,min:sp.min,n:sp.n,semaine:sem.length,minSemaine:sem.reduce((a,x)=>a+(+x.minutes||0),0)}});
+    R.pesee=ok(()=>{const st=pzStats();return {kg:st.last?st.last.kg:null,date:st.last?st.last.date:null,tendance:st.tLast,semaineAvant:st.tWeekAgo,rythme:st.slope,objectif:st.goal}});
+    R.crypto=ok(()=>{const x=crSimStats();return {ouvertes:x.open.length,fermees:x.closed.length,taux:x.rate,comparatif:S.cr&&S.cr.data?S.cr.data.date||null:null}});
+    R.docs={aLire:S.docs.filter(d=>d.statut==="à lire").length,total:S.docs.length};
+    R.ranger={n:ok(()=>arPending().length)||0};
+    R.chat=ok(()=>{const m=S.chat.slice().sort((a,b)=>(b.ts||0)-(a.ts||0))[0];return m?{role:m.role,text:String(m.text||"").replace(/\s*\n?\s*[—–-]+\s*N\.O\.V\.A\.?(?:\s*\([^)]*\))?\s*$/,"").slice(0,160),ts:m.ts}:null});
+    R.memoire={maj:S.mem&&S.mem.ts||null,savoirs:S.savoirs.length,journal:S.journal[0]?{date:S.journal[0].date||"",humeur:S.journal[0].humeur||"",energie:S.journal[0].energie||null}:null};
+    R.rituel=S.nova&&S.nova.nextRitual||null;R.pret=!!S.db;
+    return R},
+  eur:(x,d)=>eur(x,d),envoyer:t=>sendMsg(t),reveiller:(t,r)=>wakeNova(t,r),paris:()=>paris(),TYPES,DAYS,REGLES:{DOC_RULES,MR_RULES,CR_RULES,LAB_PROMPT}};
 window.addEventListener("keydown",e=>{if(e.key==="Escape"&&editing){editing=null;render()}if(e.key==="Escape"&&S.phView){S.phView=null;render()}});
 render();
 setInterval(()=>{if(S.tab==="nova"&&document.activeElement&&document.activeElement.id!=="input")soft()},60000);

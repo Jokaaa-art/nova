@@ -174,6 +174,37 @@
     ctx.beginPath(); ctx.arc(cx, cy, (mini ? 1.6 : 3.2) * (1 + niveau * 0.6), 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
   };
 
+  /* ---------- le grand noyau de l'Accueil : le même cœur 3D qu'ORACLE (Three.js), branché sur les états réels ---------- */
+  const PRESETS = {
+    veille: { energy: .68, spin: .22, open: 0, listen: 0, think: 0, exec: 0, err: 0 },
+    ecoute: { energy: .8, spin: .32, open: .06, listen: 1, think: 0, exec: 0, err: 0 },
+    reflexion: { energy: .85, spin: 1.1, open: .04, listen: 0, think: 1, exec: 0, err: 0 },
+    recherche: { energy: .85, spin: .55, open: .22, listen: 0, think: 0, exec: 1, err: 0 },
+    reponse: { energy: 1, spin: .5, open: 1, listen: 0, think: 0, exec: 0, err: 0 },
+    erreur: { energy: .6, spin: .1, open: 0, listen: 0, think: 0, exec: 0, err: 1 },
+    horsligne: { energy: .45, spin: .08, open: 0, listen: 0, think: 0, exec: 0, err: .45 },
+  };
+  const P = Object.assign({}, PRESETS.veille);
+  let hub = null, hubVisible = true, hubT0 = performance.now();
+  function webglOK() { try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); } catch (e) { return false; } }
+  function layoutHub() {
+    if (!hub) return;
+    const zr = hub.zone.getBoundingClientRect(); if (!zr.width || !zr.height) return;
+    const zH = zr.height, zW = zr.width, mh = hub.mark.offsetHeight || 84;
+    let R = Math.min((zH - mh) / 3.36, zW * .30, 300); R = Math.min(R, (zH + 60) / 4.05); R = Math.max(R, 50);
+    const cx = zW / 2, cy = R * 1.34 + 4;
+    hub.h3.resize(zW, zH); hub.h3.setFrame({ cx, cy, R: R * .86 });
+    const markTop = hub.h3.measure(0, -2.5, 0).y; hub.h3.setPodiumDrop(0);
+    const podTop = hub.h3.measure(0, -4.1, -2.45).y, need = markTop + mh + 10;
+    if (podTop < need) hub.h3.setPodiumDrop((need - podTop) / (R * .86 / 1.55));
+    hub.mark.style.top = Math.round(markTop) + "px";
+  }
+  function rendreHub(now, dt) {
+    const T = PRESETS[etat] || PRESETS.veille, k = calme() ? 1 : Math.min(1, dt * 3);
+    for (const x in P) P[x] += (T[x] - P[x]) * k;
+    hub.h3.render({ P, amp: niveau * .6, lev: niveau, t: (now - hubT0) / 1000, dt, pulses: [], reduced: calme() });
+  }
+
   let raf = 0, derniere = 0;
   function boucle() {
     if (raf) return;
@@ -183,18 +214,33 @@
       const dt = derniere ? Math.min(0.05, (now - derniere) / 1000) : 0.016; derniere = now;
       niveau += (niveauCible - niveau) * 0.2; niveauCible *= 0.92;
       let actif = false;
-      instances.forEach((i) => { if (i.visible && i.c.isConnected) { i.dessiner(now, dt); actif = true; } });
+      instances.forEach((i) => { if (!i.c.isConnected) { if (i.io) i.io.disconnect(); instances.delete(i); return; } if (i.visible) { i.dessiner(now, dt); actif = true; } });
+      if (hub && hubVisible && hub.c3.isConnected && hub.c3.offsetParent) { try { rendreHub(now, dt); actif = true; } catch (e) { hub = null; document.body.classList.remove("c3d"); } }
       if (actif && !document.hidden && !calme()) raf = requestAnimationFrame(f); else derniere = 0;
     });
   }
   function redessiner() { C = couleurs(); derniere = 0; if (raf) { cancelAnimationFrame(raf); raf = 0; } boucle(); }
   document.addEventListener("visibilitychange", () => { if (!document.hidden) boucle(); });
-  addEventListener("resize", () => { instances.forEach((i) => i.taille()); redessiner(); });
+  addEventListener("resize", () => { instances.forEach((i) => i.taille()); layoutHub(); redessiner(); });
   matchMedia("(prefers-reduced-motion: reduce)").addEventListener("change", redessiner);
 
   window.NovaCoeur = {
     ETATS,
     monter(canvas, opts) { const i = new Instance(canvas, opts); instances.add(i); redessiner(); return i; },
+    /* grand noyau : 3D si l'iPhone sait faire du WebGL, sinon le noyau 2D */
+    monterHub(zone, c2, c3, mark) {
+      if (window.Core3D && webglOK()) {
+        try {
+          hub = { zone, c3, mark, h3: Core3D.create(c3, { transparent: true, maxDpr: 1.5 }) };
+          document.body.classList.add("c3d");
+          if ("IntersectionObserver" in window) new IntersectionObserver((e) => { hubVisible = e[0].isIntersecting; if (hubVisible) boucle(); }).observe(zone);
+          requestAnimationFrame(() => { layoutHub(); redessiner(); });
+          return "3d";
+        } catch (e) { hub = null; document.body.classList.remove("c3d"); }
+      }
+      this.monter(c2); mark.style.top = "66%"; return "2d";
+    },
+    relayout() { layoutHub(); redessiner(); },
     demonter(canvas) { instances.forEach((i) => { if (i.c === canvas) { if (i.io) i.io.disconnect(); instances.delete(i); } }); },
     /* change l'état ; phrase facultative (sinon celle par défaut) */
     etat(nom, texte) {
