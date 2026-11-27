@@ -547,7 +547,7 @@
     async sauvegarde(p) {
       const sto = await S.stockage(); const exp = await S.kvLire("export_dernier"); const imp = await S.kvLire("import_dernier");
       p.innerHTML = `<section class="carte"><h2>Importer mes données</h2><p class="sous">Choisis le fichier « NOVA-donnees-….json » (ou une sauvegarde de l'appli) dans l'app Fichiers. Je te montre ce qu'il contient avant d'écrire quoi que ce soit.</p>
-          <label class="btn principal" style="margin-top:var(--e-3)">${ic("importer")}Choisir le fichier<input id="sv-f" type="file" accept=".json,application/json" class="sr-seul"></label>
+          <label class="btn principal" style="margin-top:var(--e-3)">${ic("importer")}Choisir le fichier<input id="sv-f" type="file" class="sr-seul"></label>
           <div id="sv-apercu" style="margin-top:var(--e-3)"></div>${imp ? `<p class="sous" style="margin-top:8px">Dernier import ${quand(imp.at)} : ${imp.ecrits} éléments, ${imp.fichiers} fichiers.</p>` : ""}</section>
         <section class="carte"><h2>Sauvegarder</h2><p class="sous">Crée un fichier avec tout (discussions, mémoire, budget, planning, fichiers). Range-le dans Fichiers ou iCloud. Les clés du cerveau n'y sont pas.</p>
           <div class="rangee" style="margin-top:var(--e-3)"><button class="btn principal" data-sv="exporter">${ic("sauvegarde")}Créer la sauvegarde</button></div><p class="sous" id="sv-r" role="status" style="margin-top:8px">${exp ? "Dernière : " + quand(exp.at) + "." : "Aucune sauvegarde encore."}</p></section>
