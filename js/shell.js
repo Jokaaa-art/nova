@@ -190,7 +190,7 @@
         else if (a === "ntfy") aller("outils", "notifications");
         else if (a === "ranger") aller("outils", "ranger");
         else if (a === "labo") aller("labo");
-        else if (a === "attente") { NovaAgent.rejouer().then((n) => toast(n ? n + " demande(s) reprise(s)." : "Pas de cerveau disponible pour l'instant.")); }
+        else if (a === "attente") { NovaAgent.rejouer(true).then((n) => toast(n ? n + " demande(s) reprise(s)." : "Pas de cerveau disponible pour l'instant.")); }
         else if (a === "installer") toast("Dans Safari : touche Partager, puis « Sur l'écran d'accueil ».");
       });
     }

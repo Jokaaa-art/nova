@@ -100,7 +100,7 @@
     if (p.cat === "cerveau_ordre") await NovaCerveau.regler({ ordre: p.apres });
     else if (p.cat === "cerveau_reglages") await NovaCerveau.regler({ temperature: p.apres });
     else if (p.cat === "interface") { E.reglages = Object.assign({}, E.reglages, { ordreOutils: p.apres }); }
-    else if (p.action === "rejouer") await NovaAgent.rejouer();
+    else if (p.action === "rejouer") await NovaAgent.rejouer(true);
     else if (p.action === "persister") await S.demanderPersistance();
     else if (p.action === "sauvegarder") await NovaSauvegarde.exporter();
     else if (p.action === "ntfy") { await NovaNtfy.regler({ actif: true }); await NovaAgent.planifierRituels(); }

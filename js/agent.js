@@ -314,7 +314,10 @@ memoire (ce que tu sais de lui : body) · nova (ton état, limits, nextRitual, r
   /* ---------- file de réveils ---------- */
   const file = []; let enCours = false, controleur = null;
   async function attente() { return (await S.kvLire("file_attente")) || []; }
+  const essais = new Map(); /* nombre d'essais par demande, pour ne jamais boucler */
   async function mettreEnAttente(texte, raison) {
+    const n = (essais.get(texte) || 0) + 1; essais.set(texte, n);
+    if (n > 4) { await NovaJournal.ajouter("erreur", "Abandonné après 4 essais : " + texte.slice(0, 80)); return; }
     const l = await attente(); if (!l.some((x) => x.texte === texte)) l.push({ texte, at: Date.now(), raison }); await S.kvMettre("file_attente", l.slice(-30));
     window.dispatchEvent(new CustomEvent("nova:attente"));
   }
@@ -357,8 +360,11 @@ memoire (ce que tu sais de lui : body) · nova (ton état, limits, nextRitual, r
     if (enCours) return; enCours = true;
     try { while (file.length) await traiter(file.shift()); } finally { enCours = false; }
   }
-  async function rejouer() {
+  let dernierRejeu = 0;
+  async function rejouer(force) {
+    if (!force && Date.now() - dernierRejeu < 60000) return 0;
     if (!(await C().pret())) return 0;
+    dernierRejeu = Date.now();
     const l = await attente(); if (!l.length) return 0;
     await S.kvMettre("file_attente", []);
     l.forEach((x) => file.push(x.texte)); await NovaJournal.ajouter("attente", l.length + " demande(s) en attente reprise(s)"); pompe(); return l.length;
@@ -371,7 +377,7 @@ memoire (ce que tu sais de lui : body) · nova (ton état, limits, nextRitual, r
     attente, rejouer, planifierRituels, rituels, prochainsRituels, dateParis, heureLisible, partsParis,
     async regler(r) { await doc("nova").set({ rituels: Object.assign(await rituels(), r), ts: Date.now() }, { merge: true }); await planifierRituels(); },
     async demarrer() {
-      addEventListener("online", () => { coeur("veille"); rejouer(); });
+      addEventListener("online", () => { coeur("veille"); rejouer(true); });
       addEventListener("offline", () => coeur("horsligne"));
       addEventListener("nova:cerveau", () => rejouer());
       if (!navigator.onLine) coeur("horsligne");
