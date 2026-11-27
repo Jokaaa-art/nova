@@ -10,6 +10,8 @@
 
   /* ---------- icônes (traits, 24 px) ---------- */
   const I = {
+    projets: '<path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
     accueil: '<path d="M12 3 4 7.5v9L12 21l8-4.5v-9L12 3Z"/><circle cx="12" cy="12" r="3"/>',
     chat: '<path d="M5 5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-7l-4 3v-3H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/>',
     memoire: '<circle cx="12" cy="12" r="2.2"/><circle cx="5" cy="6" r="1.6"/><circle cx="19" cy="6" r="1.6"/><circle cx="5" cy="18" r="1.6"/><circle cx="19" cy="18" r="1.6"/><path d="M6.3 7l4 3.6M17.7 7l-4 3.6M6.3 17l4-3.6M17.7 17l-4-3.6"/>',
@@ -56,6 +58,7 @@
     { id: "ranger", nom: "À ranger", tab: "ranger", groupe: "vie", ic: "ranger" },
     { id: "memoire", nom: "Mémoire", tab: "memoire", groupe: "vie", ic: "memoire", vers: ["memoire", "sait"] },
     { id: "reglages", nom: "Réglages", tab: "reglages", groupe: "vie", ic: "reglages" },
+    { id: "projets", nom: "Projets", groupe: "vie", ic: "projets" },
     { id: "cerveau", nom: "Cerveau", groupe: "sys", ic: "cerveau" },
     { id: "web", nom: "Recherche web", groupe: "sys", ic: "web" },
     { id: "voix", nom: "Voix et affichage", groupe: "sys", ic: "voix" },
@@ -128,7 +131,7 @@
     labo: ["Labo", "Comment N.O.V.A s'améliore : mesuré, réversible, et c'est toi qui valides."], outils: ["Outils", "Tous tes onglets et les réglages de N.O.V.A."],
     planning: "Ta semaine, tes créneaux et tes limites.", budget: "Ce que tu peux encore dépenser, tes relevés, ton plan.", crypto: "Apprendre, comparer, simuler. Jamais d'achat réel.",
     nutrition: "Ce que tu manges, tes calories et tes recettes.", pesee: "Ta courbe de poids et ta tendance.", sport: "Tes séances et ce qu'elles brûlent.",
-    docs: "Les documents que tu donnes à N.O.V.A.", ranger: "Ce que N.O.V.A te propose de ranger, à valider.", reglages: "Tes limites de la semaine et l'export.",
+    docs: "Les documents que tu donnes à N.O.V.A.", projets: "Tes projets, leur état et la prochaine étape. N.O.V.A les lit et peut t'aider à avancer.", ranger: "Ce que N.O.V.A te propose de ranger, à valider.", reglages: "Tes limites de la semaine et l'export.",
     cerveau: "Le cerveau en ligne gratuit de N.O.V.A.", barre: "Choisis les onglets de la barre du bas.", web: "Chercher une info sur le web.", voix: "Parler à N.O.V.A et l'entendre.", notifications: "Tes rappels, même appli fermée.",
     automatisations: "Check-in du matin et bilan du soir.", sauvegarde: "Importer et sauvegarder toutes tes données.", fichiers: "Les fichiers gardés dans ton téléphone.", securite: "Ce que N.O.V.A peut faire seule.",
   };
@@ -235,7 +238,7 @@
         <section class="panel" style="--i:3" aria-labelledby="acc-op-t"><div class="in"><div class="ph">${ic("auto")}<h2 id="acc-op-t">Activités de N.O.V.A</h2></div><div id="acc-ops" class="liste"><div class="squelette"></div></div></div></section>
         <section class="panel" style="--i:4" aria-labelledby="acc-sys-t"><div class="in"><div class="ph">${ic("cerveau")}<h2 id="acc-sys-t">Système</h2></div><div id="acc-sys"><div class="squelette"></div></div></div></section>`;
       NovaCoeur.monterHub($("core"), $("coreCv"), $("core3d"), el.querySelector(".mark"));
-      $("noyau-touche").addEventListener("click", () => parler());
+      $("noyau-touche").addEventListener("click", () => { if (window.NovaHaptique) NovaHaptique.tap(); parler(); });
       el.addEventListener("click", (e) => {
         const o = e.target.closest("[data-ouvrir]"); if (o) { ouvrirModule(o.dataset.ouvrir); return; }
         const b = e.target.closest("[data-act]"); if (!b) return;
@@ -288,6 +291,9 @@
     if (cr) t.push(tuile("crypto", "crypto", "Crypto", `<b>${cr.ouvertes} en cours</b><small>simulation${cr.fermees ? ", " + cr.fermees + " clôturée" + (cr.fermees > 1 ? "s" : "") : ""}${cr.comparatif ? ", comparatif du " + esc(cr.comparatif) : ""}</small>`));
     t.push(tuile("docs", "docs", "Documents", `<b>${R.docs.aLire ? R.docs.aLire + " à lire" : R.docs.total + " rangé" + (R.docs.total > 1 ? "s" : "")}</b><small>${R.docs.total} document${R.docs.total > 1 ? "s" : ""} donnés à N.O.V.A</small>`, { n: R.docs.aLire || "" }));
     t.push(tuile("ranger", "ranger", "À ranger", `<b>${R.ranger.n ? R.ranger.n + " à valider" : "Rien"}</b><small>${R.ranger.n ? "N.O.V.A attend ton accord" : "Tout est rangé"}</small>`, { n: R.ranger.n || "" }));
+    const pj = S.tous(B + "nova/projets/").map((d) => d.data);
+    const pjc = pj.filter((x) => (x.statut || "en cours") === "en cours");
+    t.push(tuile("projets", "projets", "Projets", pj.length ? `<b>${pjc.length} en cours</b><small>${pjc[0] && pjc[0].etape ? "Prochaine étape : " + esc(pjc[0].etape.slice(0, 70)) : pj.length + " projet" + (pj.length > 1 ? "s" : "") + " suivis par N.O.V.A"}</small>` : `<b class="petit">Aucun projet</b><small>Ajoute-les : N.O.V.A les suit avec toi.</small>`));
     const me = R.memoire;
     t.push(tuile("memoire", "memoire", "Mémoire", `<b>${me.savoirs} savoir${me.savoirs > 1 ? "s" : ""}</b><small>${me.maj ? "mise à jour " + esc(quand(me.maj)) : "pas encore remplie"}${me.journal ? ", journal du " + esc(me.journal.date) : ""}</small>`));
     t.push(tuile("reglages", "reglages", "Réglages", `<b class="petit">Tes limites</b><small>${pl ? "Stream " + pl.streamMax + " h, Entreprise " + pl.proMax + " h par semaine" : "Limites et export"}</small>`));
@@ -310,6 +316,8 @@
       ["Cerveau", et.texte, et.code === "ok" ? "ok" : "att"],
       ["Mémoire locale", n + " éléments, " + octets(sto.utilise || 0), n ? "ok" : "att"],
       ["Connexion", navigator.onLine === false ? "Hors ligne" : "En ligne", navigator.onLine === false ? "att" : "ok"],
+      ["Mode", et.code === "ok" ? "Connecté : cerveau en ligne" : "Local : réflexes et recherche dans le téléphone", et.code === "ok" ? "ok" : "att"],
+      ["Recherche locale", window.NovaRecherche ? NovaRecherche.taille().morceaux + " souvenirs indexés" : "indisponible", window.NovaRecherche ? "ok" : "att"],
       ["Sauvegarde", exp ? quand(exp.at) : "jamais faite", exp && Date.now() - exp.at < 7 * 864e5 ? "ok" : "att"],
     ];
     $("acc-sys").innerHTML = lignes.map(([k, v, s]) => `<div class="ligne-kv"><span class="k">${esc(k)}</span><span class="v"${s ? ` data-etat="${s}"` : ""}>${esc(v)}</span></div>`).join("");
@@ -383,6 +391,7 @@
     tous.filter((d) => d.path.startsWith(B + "nova/savoirs/")).forEach((d) => out.savoirs.push({ titre: d.data.title || d.id, texte: d.data.body || "", source: "Savoirs" + (d.data.domaine ? " (" + d.data.domaine + ")" : ""), date: d.data.ts, confiance: (d.data.sources || []).length ? "Sourcé" : "Noté par N.O.V.A", chemin: d.path }));
     tous.filter((d) => d.path.startsWith(B + "nova/journal/")).forEach((d) => out.journal.push({ titre: (d.data.date || d.id) + (d.data.humeur ? " — " + d.data.humeur : ""), texte: [d.data.texte, d.data.notes, d.data.resume].filter(Boolean).join("\n") || JSON.stringify(d.data).slice(0, 400), source: "Journal", date: d.data.ts, confiance: "Dit par toi", chemin: d.path }));
     tous.filter((d) => d.path.startsWith(B + "nova/chat/")).sort((a, b) => (b.data.ts || 0) - (a.data.ts || 0)).slice(0, 40).forEach((d) => out.chat.push({ titre: (d.data.role === "joka" ? "Toi : " : "N.O.V.A : ") + String(d.data.text || "").slice(0, 90), texte: d.data.text || "", source: "Chat", date: d.data.ts, confiance: d.data.role === "joka" ? "Dit par toi" : "Réponse de N.O.V.A", chemin: d.path }));
+    tous.filter((d) => d.path.startsWith(B + "nova/projets/")).forEach((d) => out.projets.push({ titre: d.data.titre || d.id, texte: [d.data.statut, d.data.etape, d.data.note].filter(Boolean).join(" — "), source: "Projets", date: d.data.maj || d.data.ts, confiance: "Écrit par toi", chemin: d.path }));
     Object.values(out).forEach((l) => l.sort((a, b) => (b.date || 0) - (a.date || 0)));
     return out;
   }
@@ -436,6 +445,13 @@
     const data = E.memData || elementsMemoire(); const q = E.memRecherche.trim().toLowerCase();
     const cats = E.memCat ? CATS.filter((c) => c.id === E.memCat) : CATS;
     let html = "";
+    if (q && window.NovaRecherche) {
+      const TYPES = { chat: ["Toi, dans le chat", "N.O.V.A, dans le chat"], journal: ["Journal"], savoirs: ["Connaissance"], projets: ["Projet"] };
+      const types = E.memCat ? (TYPES[E.memCat] || ["Ce qu'elle sait"]) : null;
+      const r = NovaRecherche.chercher(q, { limite: 30, types });
+      $("mem-liste").innerHTML = r.length ? `<section class="carte fiche" aria-label="Résultats"><h2>Résultats <span class="mono">${r.length}</span></h2><p class="sous">Classés par pertinence, cherchés dans le téléphone (sans Internet).</p><div class="liste">${r.map((x) => `<div class="el"><div class="t"><b>${esc(x.extrait)}</b><small>${esc(x.type)}, ${esc(x.confiance)}${x.date ? ", le " + esc(x.date) : ""}</small></div></div>`).join("")}</div></section>` : `<p class="vide">Aucun résultat pour « ${esc(q)} ».</p>`;
+      return;
+    }
     for (const c of cats) {
       let l = data[c.id]; if (q) l = l.filter((x) => (x.titre + " " + x.texte).toLowerCase().includes(q));
       if (!l.length && (q || !E.memCat)) continue;
@@ -487,8 +503,31 @@
       <section class="carte"><h2>À valider par toi</h2>${ev.propositions.length ? `<div class="liste">${ev.propositions.map((p) => `<div class="el"><div class="t"><b>${esc(p.titre)}</b><small>${esc(p.detail || "")}</small><small>Domaine : ${esc(NovaEvolution.LIBELLES[p.cat] || p.cat)}</small><div class="rangee" style="margin-top:8px"><button class="btn principal" data-lab="oui" data-cle="${esc(p.cle)}">Accepter</button><button class="btn" data-lab="non" data-cle="${esc(p.cle)}">Refuser</button></div></div></div>`).join("")}</div>` : `<p class="vide">Rien à valider. Je te demanderai avant tout changement important.</p>`}</section>
       <section class="carte"><h2>Ce que j'ai appris</h2>${ev.apprentissages.length ? `<div class="liste">${ev.apprentissages.slice().reverse().slice(0, 10).map((a) => `<div class="el"><div class="t"><b>${esc(a.texte)}</b></div><time class="mono">${new Date(a.at).toLocaleDateString("fr-FR")}</time></div>`).join("")}</div>` : `<p class="vide">Rien encore : j'apprends en te regardant utiliser l'appli.</p>`}</section>
       <section class="carte"><h2>Changements</h2>${ev.historique.length ? `<div class="liste">${ev.historique.slice().reverse().slice(0, 15).map((h) => `<div class="el"><div class="t"><b>${esc(h.titre)}</b><small>${esc(statut[h.statut] || h.statut)}${h.niveau ? " (" + esc((NovaEvolution.NIVEAUX[h.niveau] || "").toLowerCase()) + ")" : ""}</small>${h.verdict ? `<small>${esc(h.verdict)}</small>` : ""}</div>${(h.statut === "validé" || h.statut === "appliqué" || h.statut === "en test") && /cerveau_ordre|cerveau_reglages|interface/.test(h.cat) ? `<button class="btn" data-lab="annuler" data-at="${h.at}">Annuler</button>` : ""}</div>`).join("")}</div>` : `<p class="vide">Aucun changement pour l'instant.</p>`}</section>
+      <div id="lab-vivant"></div>
       <section class="carte"><h2>Cerveaux en ligne</h2>${Object.keys(st).length ? Object.entries(st).map(([f, x]) => { const r = x.recents || []; const ok = r.filter((y) => y.ok).length; return `<div class="ligne-kv"><span class="k">${esc((NovaCerveau.FOURNISSEURS[f] || {}).nom || f)}</span><span class="v">${r.length ? Math.round(ok / r.length * 100) + " %, " + (x.ms || "?") + " ms" : "pas mesuré"}</span></div>`; }).join("") : `<p class="vide">Pas encore d'appel mesuré.</p>`}</section>`;
-    monterMini(el); majCycle();
+    monterMini(el); majCycle(); laboVivant();
+  }
+  async function laboVivant() {
+    const z = $("lab-vivant"); if (!z) return;
+    const ops = await NovaJournal.derniers(300);
+    const file = await NovaAgent.attente(); const a = NovaCoeur.actuel();
+    const rech = ops.filter((o) => o.type === "recherche").slice(0, 8);
+    const errs = ops.filter((o) => o.type === "erreur").slice(0, 6);
+    const js = ((await S.kvLire("erreurs_js")) || []).slice(-4).reverse();
+    let r1 = []; try { const R = await NovaAgent.rituels(); if (R && R.actif !== false) r1 = NovaAgent.prochainsRituels(R, Date.now(), 2); } catch (e) {}
+    const taches = [];
+    if (NovaAgent.occupe()) taches.push(["En ce moment", a.phrase || a.nom || "Elle réfléchit"]);
+    file.forEach((x) => taches.push(["En attente d'un cerveau", x.texte.replace(/^MESSAGE \S+ — /, "").slice(0, 90)]));
+    (r1 || []).slice(0, 2).forEach((x) => taches.push(["Prévu", (x.label || x.kind || "Rituel") + (x.at ? ", " + quand(x.at) : "")]));
+    z.innerHTML = `
+      <section class="carte"><h2>Tâches en cours</h2>${taches.length ? `<div class="liste">${taches.map(([k, v]) => `<div class="el"><div class="t"><b>${esc(v)}</b><small>${esc(k)}</small></div></div>`).join("")}</div>` : `<p class="vide">Rien en cours. Elle travaille quand tu lui écris, aux rituels et pendant les cycles du Labo (appli ouverte).</p>`}</section>
+      <section class="carte"><h2>Recherches et sources</h2>${rech.length ? `<div class="liste">${rech.map((o) => `<div class="el"><div class="t"><b>${esc(o.texte.replace(/^Recherche( web)? : /, ""))}</b><small>${esc(quand(o.ts))}${(o.sources || []).length ? "" : ", sans source gardée"}</small>${(o.sources || []).slice(0, 3).map((x) => `<small>${lien(x.url, x.titre || x.url)}</small>`).join("")}</div></div>`).join("")}</div>` : `<p class="vide">Aucune recherche pour l'instant.</p>`}</section>
+      <section class="carte"><h2>Erreurs détectées</h2>${errs.length || js.length ? `<div class="liste">${errs.map((o) => `<div class="el"><div class="t"><b>${esc(o.texte)}</b><small>${esc(quand(o.ts))}</small></div></div>`).join("")}${js.map((e) => `<div class="el"><div class="t"><b>${esc(e.message)}</b><small>Erreur du code, ${esc(quand(e.at))} (gardée dans le téléphone)</small></div></div>`).join("")}</div>` : `<p class="vide">Aucune erreur notée.</p>`}</section>
+      <section class="carte"><h2>Comment elle apprend</h2><div class="liste">
+        <div class="el"><div class="t"><b>Par la mémoire</b><small>Elle note ce que tu lui dis et le retrouve avec la recherche locale du téléphone.</small></div></div>
+        <div class="el"><div class="t"><b>Par ses méthodes</b><small>Le Labo teste un réglage, mesure, et le garde seulement si c'est mieux. Tout est annulable.</small></div></div>
+        <div class="el"><div class="t"><b>Pas de réentraînement</b><small>Les cerveaux en ligne ne sont pas réentraînés par l'appli : ils restent les mêmes, c'est ce qu'elle sait de toi qui grandit.</small></div></div>
+      </div></section>`;
   }
   function majCycle() {
     const i = NovaEvolution.etape(); const c = $("lab-cycle"); if (!c) return;
@@ -542,6 +581,50 @@
   const interrupteur = (id, on, label) => `<button class="interrupteur" role="switch" id="${id}" aria-checked="${on ? "true" : "false"}" aria-label="${esc(label)}"></button>`;
 
   const PANNEAUX = {
+    async projets(p) {
+      const col = () => S.collection(B + "nova/projets");
+      const ORDRE = { "en cours": 0, "en pause": 1, "fini": 2 };
+      const dessiner = async () => {
+        const l = (await col().get()).docs.map((d) => Object.assign({ id: d.id }, d.data()));
+        l.sort((a, b) => (ORDRE[a.statut || "en cours"] - ORDRE[b.statut || "en cours"]) || ((b.maj || b.ts || 0) - (a.maj || a.ts || 0)));
+        p.innerHTML = `
+          <section class="carte"><h2>Nouveau projet</h2>
+            <div class="champ"><label for="pj-t">Nom du projet</label><input id="pj-t" maxlength="80" autocomplete="off" enterkeyhint="next"></div>
+            <div class="champ"><label for="pj-e">Prochaine étape (facultatif)</label><input id="pj-e" maxlength="160" autocomplete="off" enterkeyhint="done"></div>
+            <div class="rangee"><button class="btn principal" data-pj="ajouter">${ic("plus")}Ajouter</button></div></section>
+          <section class="carte"><h2>Tes projets <span class="mono">${l.length}</span></h2>${l.length ? `<div class="liste">${l.map((x) => `
+            <div class="el projet" data-id="${esc(x.id)}"><div class="t" style="width:100%">
+              <b>${esc(x.titre)}</b><small>${esc(x.statut || "en cours")}${x.maj ? ", mis à jour " + esc(quand(x.maj)) : ""}</small>
+              <div class="champ" style="margin-top:8px"><label for="pj-et-${esc(x.id)}">Prochaine étape</label><input id="pj-et-${esc(x.id)}" data-pj-etape value="${esc(x.etape || "")}" maxlength="160" autocomplete="off" enterkeyhint="done"></div>
+              <div class="segment" role="group" aria-label="Statut de ${esc(x.titre)}">${["en cours", "en pause", "fini"].map((st) => `<button data-pj-statut="${st}" aria-pressed="${(x.statut || "en cours") === st}">${st}</button>`).join("")}</div>
+              <div class="rangee" style="margin-top:8px"><button class="btn" data-pj="aide">${ic("chat")}Avancer avec N.O.V.A</button><button class="btn danger" data-pj="suppr">Supprimer</button></div>
+            </div></div>`).join("")}</div>` : `<p class="vide">Aucun projet pour l'instant. Ajoute le premier : N.O.V.A le suivra avec toi.</p>`}</section>`;
+      };
+      const maj = async (id, champs, msg) => { await col().doc(id).set(Object.assign({ maj: Date.now() }, champs), { merge: true }); if (msg) await NovaJournal.ajouter("projet", msg); };
+      p.onclick = async (e) => {
+        const b = e.target.closest("[data-pj],[data-pj-statut]"); if (!b) return;
+        if (window.NovaHaptique) NovaHaptique.tap();
+        const id = (b.closest("[data-id]") || {}).dataset ? b.closest("[data-id]") && b.closest("[data-id]").dataset.id : null;
+        if (b.dataset.pj === "ajouter") {
+          const t = $("pj-t").value.trim(), et = $("pj-e").value.trim(); if (!t) { $("pj-t").focus(); toast("Donne un nom au projet."); return; }
+          await col().add({ titre: t, etape: et, statut: "en cours", ts: Date.now(), maj: Date.now() }); await NovaJournal.ajouter("projet", "Projet ajouté : " + t);
+          toast("Projet ajouté."); await dessiner(); return;
+        }
+        if (!id) return;
+        const x = (await col().doc(id).get()).data() || {};
+        if (b.dataset.pjStatut) { await maj(id, { statut: b.dataset.pjStatut }, "Projet « " + x.titre + " » : " + b.dataset.pjStatut); await dessiner(); return; }
+        if (b.dataset.pj === "aide") { if (V1()) V1().envoyer("Aide-moi à avancer sur mon projet « " + x.titre + " »" + (x.etape ? " (prochaine étape : " + x.etape + ")" : "") + "."); aller("chat"); return; }
+        if (b.dataset.pj === "suppr") {
+          if (!confirm("Supprimer le projet « " + x.titre + " » ? C'est définitif (sauf si tu as une sauvegarde).")) return;
+          await col().doc(id).delete(); await NovaJournal.ajouter("projet", "Projet supprimé par Joka : " + x.titre); toast("Projet supprimé."); await dessiner();
+        }
+      };
+      p.onchange = async (e) => {
+        const i = e.target.closest("[data-pj-etape]"); if (!i) return;
+        const id = i.closest("[data-id]").dataset.id; await maj(id, { etape: i.value.trim() }); toast("Étape enregistrée.");
+      };
+      await dessiner();
+    },
     async barre(p) {
       const liste = CHOIX_BARRE();
       const sel = (i) => `<div class="champ"><label for="br-${i}">Emplacement ${i + 2}</label><select id="br-${i}">${liste.map((m) => `<option value="${m.id}"${(E.barre[i] || BARRE_DEFAUT[i]) === m.id ? " selected" : ""}>${esc(m.nom)}</option>`).join("")}</select></div>`;
@@ -637,10 +720,12 @@
         <div class="reglage"><div><b>Lire ses réponses à voix haute</b><span>Quand l'appli est ouverte.</span></div>${interrupteur("vx-lec", !!v.lecture, "Lire les réponses à voix haute")}</div>
         ${voix.length ? `<div class="champ" style="margin-top:var(--e-3)"><label for="vx-nom">Voix</label><select id="vx-nom">${voix.map((x) => `<option${x.name === v.nom ? " selected" : ""}>${esc(x.name)}</option>`).join("")}</select></div>` : ""}
         <div class="rangee" style="margin-top:var(--e-3)"><button class="btn" data-vx="test">Écouter un essai</button></div></section>
-        <section class="carte"><h2>Affichage</h2><div class="reglage"><div><b>Moins d'animations</b><span>Le noyau reste fixe, il change seulement de couleur et de forme selon l'état.</span></div>${interrupteur("vx-calme", document.documentElement.dataset.calme === "1", "Moins d'animations")}</div></section>`;
+        <section class="carte"><h2>Affichage</h2><div class="reglage"><div><b>Moins d'animations</b><span>Le noyau reste fixe, il change seulement de couleur et de forme selon l'état.</span></div>${interrupteur("vx-calme", document.documentElement.dataset.calme === "1", "Moins d'animations")}</div>
+        <div class="reglage"><div><b>Vibrations</b><span>Petit retour au toucher (envoi, onglets, noyau). Sur iPhone : iOS 18 ou plus, et seulement quand tu touches l'écran.</span></div>${interrupteur("vx-hap", window.NovaHaptique ? NovaHaptique.actif : false, "Vibrations")}</div></section>`;
       p.onclick = async (e) => {
         const cur = (await S.kvLire("voix")) || {};
         if (e.target.closest("#vx-lec")) { cur.lecture = !cur.lecture; await S.kvMettre("voix", cur); $("vx-lec").setAttribute("aria-checked", String(cur.lecture)); return; }
+        if (e.target.closest("#vx-hap")) { await NovaHaptique.regler(!NovaHaptique.actif); $("vx-hap").setAttribute("aria-checked", String(NovaHaptique.actif)); NovaHaptique.tap(); return; }
         if (e.target.closest("#vx-calme")) { const on = document.documentElement.dataset.calme !== "1"; document.documentElement.dataset.calme = on ? "1" : "0"; await S.kvMettre("calme", on); $("vx-calme").setAttribute("aria-checked", String(on)); NovaCoeur.rafraichir(); return; }
         const b = e.target.closest("[data-vx]"); if (!b) return;
         if (b.dataset.vx === "ecoute") { aller("accueil"); setTimeout(parler, 300); }
@@ -836,6 +921,29 @@
     });
     /* l'état de travail de N.O.V.A (écrit par l'agent) pilote aussi le noyau */
     S.doc(B + "nova").onSnapshot((s) => { const d = s.data() || {}; if (d.state === "working" && NovaCoeur.actuel().etat === "veille") NovaCoeur.etat("reflexion", "N.O.V.A réfléchit… " + (d.note ? "(" + d.note + ")" : "")); majBarre(); });
+    /* bouton « Arrêter » : visible seulement quand elle travaille vraiment */
+    const majArreter = () => { const b = $("arreter"); if (b) b.hidden = !(NovaAgent.occupe() && ["chat", "accueil"].includes(document.body.dataset.vue)); };
+    addEventListener("nova:agent", majArreter); NovaCoeur.ecouter(majArreter); addEventListener("hashchange", () => setTimeout(majArreter, 50));
+    $("arreter").addEventListener("click", () => { if (window.NovaHaptique) NovaHaptique.tap(); NovaAgent.arreter(); toast("Arrêté. Rien n'a été effacé."); });
+    /* ses nouvelles réponses apparaissent progressivement (le texte est déjà arrivé : c'est l'affichage qui se déroule) */
+    /* le code v1 redessine la liste souvent : on garde l'heure de départ de chaque apparition pour la reprendre là où elle en était */
+    const apparitions = new Map(); const depuis = Date.now();
+    new MutationObserver(() => {
+      document.querySelectorAll("#v1hote .msg.m-nova[data-ts]").forEach((m) => {
+        const ts = +m.dataset.ts; if (ts <= depuis || m.classList.contains("neuf")) return;
+        let a = apparitions.get(ts);
+        if (!a) {
+          const n = (m.textContent || "").length; a = { debut: performance.now(), d: Math.min(2.6, 0.5 + n / 500) }; apparitions.set(ts, a);
+          if (window.NovaHaptique) NovaHaptique.succes();
+        }
+        const ecoule = (performance.now() - a.debut) / 1000;
+        if (ecoule >= a.d || document.documentElement.dataset.calme === "1") return;
+        m.style.setProperty("--d", a.d.toFixed(2) + "s"); m.style.animationDelay = ""; m.querySelector(".bubble") && (m.querySelector(".bubble").style.animationDelay = (-ecoule).toFixed(2) + "s");
+        m.classList.add("neuf");
+      });
+    }).observe($("v1hote"), { childList: true, subtree: true });
+    document.addEventListener("submit", (e) => { if (e.target.closest(".composer, .convo") && window.NovaHaptique) NovaHaptique.tap(); }, true);
+    $("tabbar").addEventListener("click", (e) => { if (e.target.closest("button") && window.NovaHaptique) NovaHaptique.tap(); });
     await NovaAgent.demarrer();
     if (!(await NovaCerveau.pret()) && navigator.onLine !== false) { const et = await NovaCerveau.etatTexte(); NovaCoeur.etat("veille", et.code === "cle" ? "Ajoute une clé gratuite (Outils → Cerveau) pour que je réfléchisse." : et.code === "autorisation" ? "Autorise mon cerveau en ligne (Outils → Cerveau)." : NovaCoeur.ETATS.veille.phrase); }
     NovaEvolution.demarrer();

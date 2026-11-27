@@ -152,10 +152,13 @@
     }
     if (o === "repondre") {
       const salon = a.salon === "cryptochat" ? "nova/cryptochat" : "nova/chat";
+      ctx.repondu = ctx.repondu || {};
+      if (ctx.repondu[salon]) return { ok: true, ignore: "déjà répondu dans ce réveil : une seule réponse" };
       const texte = String(a.texte || "").trim().replace(/\s*\n?\s*[—–-]+\s*N\.O\.V\.A\.?\s*$/, ""); if (!texte) throw new Error("texte vide");
       coeur("reponse");
       const ts = Date.now(); await col(salon).doc("n" + ts).set({ role: "nova", text: texte, kind: a.kind || ctx.kindChat || "message", ts });
-      ctx.reponses++; ctx.ecritures.push(salon);
+      ctx.reponses++; ctx.repondu[salon] = true; ctx.ecritures.push(salon);
+      if (ctx.messageId) await effacerAttente(ctx.messageId);
       return { ok: true };
     }
     if (o === "memoriser") {
@@ -165,10 +168,15 @@
       await ref.set({ body: (old ? old.replace(/\s+$/, "") + "\n" : "") + "- " + ligne, previousBody: old, ts: Date.now(), editedBy: "nova" });
       ctx.ecritures.push("memoire"); await NovaJournal.ajouter("memoire", "Mémorisé : " + ligne.slice(0, 120)); return { ok: true };
     }
+    if (o === "chercher") {
+      if (!window.NovaRecherche) throw new Error("recherche locale indisponible");
+      return { ou: "dans le téléphone (recherche locale)", resultats: NovaRecherche.chercher(String(a.question || ""), { limite: Math.min(+a.limite || 8, 15) }) };
+    }
     if (o === "web") {
       coeur("recherche"); ctx.web++;
       if (ctx.web > 4) throw new Error("4 recherches web au plus par réveil");
       const r = await C().recherche(String(a.question || ""), { signal: ctx.signal });
+      await NovaJournal.ajouter("recherche", "Recherche web : " + String(a.question || "").slice(0, 120), { sources: (r.sources || []).slice(0, 6).map((x) => ({ titre: String(x.titre || x.title || x.url || "").slice(0, 120), url: x.url || x.uri || "" })).filter((x) => /^https:\/\//.test(x.url)) });
       coeur("reflexion");
       return { texte: (r.texte || "").slice(0, 4000), sources: (r.sources || []).slice(0, 6), note: r.note || "", date: dateParis() };
     }
@@ -208,13 +216,16 @@ Outils (dans "actions", exécutés dans l'ordre) :
 - {"outil":"memoriser","texte":"un fait durable qu'il t'a dit"}
 - {"outil":"calcul","expression":"(120*4)/7"}
 - {"outil":"heure"}
+- {"outil":"chercher","question":"...","limite":8}  (cherche dans TOUTE sa mémoire, dans le téléphone : souvenirs, savoirs, journal, chat, documents, projets ; classé par pertinence)
 - {"outil":"web","question":"..."}  (4 au plus ; réponse datée avec sources)
 - {"outil":"voir_fichier","asset":"ID"}  (texte : tu le lis ; image ou PDF : il est joint à ta réflexion suivante)
 - {"outil":"notifier","titre":"...","texte":"...","dans_minutes":30}  (jamais de montant ni de détail privé)
 Mets "fini":false si tu attends le résultat d'un outil ; tu le recevras au tour suivant. Mets "fini":true quand tout est écrit. 6 tours au plus.
+Si tu as utilisé le web, finis ta réponse par « Sources : » et 1 à 3 liens au format [titre](https://...). Ne cite jamais un lien que tu n'as pas reçu.
+Tu ne réponds qu'UNE fois par réveil : cherche d'abord (lire, web, calcul…), puis « repondre » en dernier, avec "fini":true. Ta réponse termine le réveil.
 Tes anciennes consignes ont été écrites pour ta version « tâche Claude » : ici « date +%s%3N » = outil heure ; un calcul « par commande » = outil calcul ; update / set / if_version = outil ecrire ; Artifact read, Read ou pdftotext = outil voir_fichier ; PushNotification = outil notifier ; « mets state working / idle » : l'appli le fait. Notion, Gmail, Agenda, Journal des agents, ATLAS et ORACLE ne sont pas joignables d'ici : saute ces étapes sans le dire.
 CARTE DE SES DONNÉES (chemins sous data/users/me)
-memoire (ce que tu sais de lui : body) · nova (ton état, limits, nextRitual, rituels) · nova/chat (son chat : role joka|nova, text, kind, ts) · nova/cryptochat · nova/docs (ses documents) · nova/journal · nova/savoirs · nova/aranger (à ranger, statut « à valider ») · nova/rdv · nova/repas · nova/recettes (idées du jour, id = date) · nova/mesrecettes · nova/ingredients (valeurs vérifiées par Joka, lecture seule) · nova/pesees · nova/pas · nova/seances · nutrition · pesee · sport · budget (lecture seule) · budget_faits (chiffres calculés par la page) · crypto (lecture seule) · cryptodata (ton comparatif) · nova/cryptosim (lecture seule).`;
+memoire (ce que tu sais de lui : body) · nova (ton état, limits, nextRitual, rituels) · nova/chat (son chat : role joka|nova, text, kind, ts) · nova/cryptochat · nova/docs (ses documents) · nova/projets (ses projets : titre, statut en cours|en pause|fini, etape = prochaine étape, note, maj) · nova/journal · nova/savoirs · nova/aranger (à ranger, statut « à valider ») · nova/rdv · nova/repas · nova/recettes (idées du jour, id = date) · nova/mesrecettes · nova/ingredients (valeurs vérifiées par Joka, lecture seule) · nova/pesees · nova/pas · nova/seances · nutrition · pesee · sport · budget (lecture seule) · budget_faits (chiffres calculés par la page) · crypto (lecture seule) · cryptodata (ton comparatif) · nova/cryptosim (lecture seule).`;
 
   function genre(t) {
     const m = /^(MESSAGE|DOCUMENT|REPAS|RECETTE PERSO|RECETTES|ACHAT|BUDGET-ALERTE|PLANNING|RITUEL|CRYPTO MAJ|CRYPTO)\b\s*(?:—\s*)?(\w+)?/.exec(t);
@@ -243,6 +254,15 @@ memoire (ce que tu sais de lui : body) · nova (ton état, limits, nextRitual, r
       "DERNIERS MESSAGES DU CHAT : " + (await lire("nova/chat", 10)).documents,
     ];
     const id = g.id;
+    if (g.k === "MESSAGE" && id && window.NovaRecherche) {
+      try {
+        const m = (await doc("nova/chat/" + id).get()).data();
+        const l = NovaRecherche.chercher((m && m.text) || "", { limite: 6, sauf: ["nova/chat/" + id] });
+        if (l.length) parts.push("SOUVENIRS LIÉS À SON MESSAGE (recherche locale dans le téléphone) :\n" + l.map((x) => `- [${x.type}${x.date ? ", " + x.date : ""}] ${x.extrait}`).join("\n"));
+      } catch (e) {}
+    }
+    const projets = await lire("nova/projets", 12);
+    if (g.k === "MESSAGE" || g.k === "POINT" || g.k === "RITUEL") parts.push("SES PROJETS : " + (projets.documents && projets.documents !== "[]" ? projets.documents : "aucun pour l'instant"));
     if (g.k === "DOCUMENT" && id) parts.push("LE DOCUMENT : " + JSON.stringify(await lire("nova/docs/" + id)), "CONSIGNES DOCUMENT :\n" + window.NovaV1.REGLES.DOC_RULES);
     if (g.k === "REPAS" && id) parts.push("LE REPAS : " + JSON.stringify(await lire("nova/repas/" + id)), "NUTRITION : " + JSON.stringify(await lire("nutrition")), "REPAS RÉCENTS : " + (await lire("nova/repas", 8)).documents, "INGRÉDIENTS VÉRIFIÉS : " + (await lire("nova/ingredients", 60)).documents);
     if (g.k === "RECETTE PERSO" && id) parts.push("LA RECETTE : " + JSON.stringify(await lire("nova/mesrecettes/" + id)), "INGRÉDIENTS VÉRIFIÉS : " + (await lire("nova/ingredients", 60)).documents, "CONSIGNES RECETTE :\n" + window.NovaV1.REGLES.MR_RULES);
@@ -267,19 +287,30 @@ memoire (ce que tu sais de lui : body) · nova (ton état, limits, nextRitual, r
       r = l.length ? "Aujourd'hui : " + l.map((b) => `${hh(b.start)}–${hh(b.end)} ${(V1.TYPES[b.type] && V1.TYPES[b.type].label) || b.type}`).join(", ") + "." : "Rien de prévu aujourd'hui dans ton planning.";
     } else if (/limite|trop d.?heures|semaine charg/.test(q)) {
       const a = V1 ? V1.attention() : []; r = a.length ? "Attention : " + a.map((x) => x[1]).join(" ; ") + "." : "Tu es dans tes limites cette semaine.";
+    } else if (window.NovaRecherche && /souviens|rappelle|t.ai dit|je t.avais|c.?est quoi mon|c.?est quoi ma|qu.est.ce que je|retrouve|cherche dans/.test(q)) {
+      const l = NovaRecherche.chercher(q, { limite: 3, sauf: ["nova/chat/" + g.id] });
+      r = l.length ? "Dans ma mémoire (recherche dans le téléphone) :\n" + l.map((x) => `• ${x.extrait}${x.date ? " (" + x.date + ")" : ""}`).join("\n") : "Je ne trouve rien là-dessus dans ma mémoire du téléphone.";
     } else if (/ranger|valider/.test(q)) {
       const a = V1 ? V1.aRanger() : []; r = a.length ? `Tu as ${a.length} élément(s) à valider dans « À ranger ».` : "Rien à valider dans « À ranger ».";
     }
     const suite = raison === "horsligne" ? "Je te réponds vraiment dès que la connexion revient." : raison === "cle" || raison === "autorisation" ? "Pour une vraie réponse, active mon cerveau dans Outils → Cerveau." : "Je réessaie dans un moment.";
     const ts = Date.now();
-    await col("nova/chat").doc("n" + ts).set({ role: "nova", text: (r ? r + "\n\n" : "J'ai bien reçu ton message et je le garde. ") + suite + "\n(réponse rapide, sans cerveau en ligne)", kind: "message", ts, reflexe: true });
+    await col("nova/chat").doc("n" + ts).set({ role: "nova", text: (r ? r + "\n\n" : "J'ai bien reçu ton message et je le garde. ") + suite + "\n(réponse rapide, sans cerveau en ligne)", kind: "message", ts, reflexe: true, attente: g.id, utile: !!r });
     return !!r;
+  }
+
+  /* Quand la vraie réponse arrive, le simple « je le garde » de ce message n'a plus de raison d'être (sinon : deux réponses). */
+  async function effacerAttente(id) {
+    try {
+      const s = await col("nova/chat").orderBy("ts", "desc").limit(60).get();
+      for (const d of s.docs) { const m = d.data(); if (m.reflexe && m.attente === id && !m.utile) await col("nova/chat").doc(d.id).delete(); }
+    } catch (e) {}
   }
 
   /* ---------- la boucle de réflexion ---------- */
   async function reflechir(texte, signal) {
     const g = genre(texte);
-    const ctx = { ecritures: [], reponses: 0, web: 0, pieces: [], signal, kindChat: { DOCUMENT: "document", ACHAT: "budget", "BUDGET-ALERTE": "alerte", PLANNING: "planning", RITUEL: "matin" }[g.k] || "message" };
+    const ctx = { ecritures: [], reponses: 0, web: 0, pieces: [], signal, messageId: g.k === "MESSAGE" ? g.id : null, kindChat: { DOCUMENT: "document", ACHAT: "budget", "BUDGET-ALERTE": "alerte", PLANNING: "planning", RITUEL: "matin" }[g.k] || "message" };
     if (g.k === "RITUEL") { const n = (await doc("nova").get()).data() || {}; ctx.kindChat = (n.nextRitual && n.nextRitual.kind === "soir") ? "soir" : "matin"; }
     const base = await contexte(g, texte);
     const regles = g.k === "CRYPTO" || g.k === "CRYPTO MAJ" ? "\n\nCONSIGNES CRYPTO :\n" + window.NovaV1.REGLES.CR_RULES : "";
@@ -293,7 +324,9 @@ memoire (ce que tu sais de lui : body) · nova (ton état, limits, nextRitual, r
       coeur("reflexion");
       const prompt = `RÉVEIL REÇU :\n${texte}${consigne ? "\n\n" + consigne : ""}${regles}\n\nCONTEXTE :\n${base}${tours ? "\n\nTES TOURS PRÉCÉDENTS ET RÉSULTATS DES OUTILS :\n" + tours : ""}\n\nTour ${tour}/6. Réponds en JSON.`;
       const images = ctx.pieces.splice(0);
-      const rep = await C().json(prompt, { systeme: SYSTEME, signal, images, max: 3000 });
+      let rep;
+      try { rep = await C().json(prompt, { systeme: SYSTEME, signal, images, max: 3000 }); }
+      catch (e) { e.reponses = ctx.reponses; throw e; }
       derniere = rep;
       const actions = Array.isArray(rep.actions) ? rep.actions.slice(0, 8) : [];
       const res = [];
@@ -302,7 +335,7 @@ memoire (ce que tu sais de lui : body) · nova (ton état, limits, nextRitual, r
         catch (e) { res.push({ outil: a.outil, erreur: e.message }); }
       }
       tours += `\nTour ${tour} — pensée : ${String(rep.pensee || "").slice(0, 200)}\nRésultats : ${resumeDonnee(res, 12000)}`;
-      if (rep.fini || !actions.length) break;
+      if (rep.fini || !actions.length || ctx.reponses) break; /* une réponse écrite termine le réveil (sinon doublon) */
     }
     if (g.k === "MESSAGE" && !ctx.reponses) {
       const msg = derniere && (derniere.reponse || derniere.texte || derniere.message);
@@ -345,8 +378,10 @@ memoire (ce que tu sais de lui : body) · nova (ton état, limits, nextRitual, r
       if (g.k === "PLANNING") await planifierRituels();
       coeur("veille");
     } catch (e) {
-      await NovaJournal.ajouter("erreur", `${g.k.toLowerCase()} : ${e.message}`, { genre: g.k, ok: false, ms: Date.now() - t0 });
-      if (e.code === "cancelled") { coeur("veille"); }
+      const arrete = e.code === "cancelled" || (controleur && controleur.signal.aborted);
+      if (!arrete) await NovaJournal.ajouter("erreur", `${g.k.toLowerCase()} : ${e.message}`, { genre: g.k, ok: false, ms: Date.now() - t0 });
+      if (arrete) { coeur("veille"); } /* arrêté par Joka : ni erreur ni nouvel essai */
+      else if (e.reponses) { coeur("veille"); } /* déjà répondu : rien à rattraper */
       else if (["horsligne", "quota", "cle", "autorisation", "service"].includes(e.code)) {
         await reflexe(g, texte, e.code === "horsligne" ? "horsligne" : "service"); await mettreEnAttente(texte, e.code); coeur(e.code === "horsligne" ? "horsligne" : "erreur", "Je n'ai pas pu réfléchir : " + e.message);
       } else coeur("erreur", "Erreur : " + e.message);
@@ -357,9 +392,10 @@ memoire (ce que tu sais de lui : body) · nova (ton état, limits, nextRitual, r
     if (a.length) { const ts = Date.now(); await col("nova/chat").doc("n" + ts).set({ role: "nova", text: "Ton planning dépasse tes limites : " + a.map((x) => x[1]).join(" ; ") + ".\nOn en reparle quand tu veux.", kind: "planning", ts }); }
     await NovaJournal.ajouter("planning", a.length ? a.length + " limite(s) dépassée(s) signalée(s)" : "Planning vérifié : dans les limites");
   }
+  const signaler = () => window.dispatchEvent(new CustomEvent("nova:agent", { detail: { occupe: enCours } }));
   async function pompe() {
-    if (enCours) return; enCours = true;
-    try { while (file.length) await traiter(file.shift()); } finally { enCours = false; }
+    if (enCours) return; enCours = true; signaler();
+    try { while (file.length) await traiter(file.shift()); } finally { enCours = false; signaler(); }
   }
   let dernierRejeu = 0;
   async function rejouer(force) {
@@ -374,6 +410,8 @@ memoire (ce que tu sais de lui : body) · nova (ton état, limits, nextRitual, r
   window.NovaAgent = {
     reveil(texte) { if (!texte) return; file.push(String(texte)); pompe(); },
     annuler() { if (controleur) controleur.abort(); },
+    /* bouton « Arrêter » : coupe la réflexion en cours et vide ce qui attendait derrière (rien n'est effacé de la mémoire) */
+    arreter() { const n = file.length; file.length = 0; if (controleur) controleur.abort(); NovaJournal.ajouter("arret", "Arrêté par Joka" + (n ? " (" + n + " demande(s) suivante(s) annulée(s))" : "")); },
     occupe: () => enCours,
     attente, rejouer, planifierRituels, rituels, prochainsRituels, dateParis, heureLisible, partsParis,
     async regler(r) { await doc("nova").set({ rituels: Object.assign(await rituels(), r), ts: Date.now() }, { merge: true }); await planifierRituels(); },

@@ -154,7 +154,7 @@ function viewNova(){
 }
 function msgHtml(m){
   const nova=m.role!=="joka";const k=m.kind&&m.kind!=="message"?{matin:"Check-in",soir:"Bilan",alerte:"Alerte",planning:"Planning",idee:"Idée",budget:"Budget",document:"Document"}[m.kind]||m.kind:"";
-  return `<div class="msg ${nova?"m-nova":"m-joka"}"><div class="bubble">${md(m.role==="nova"?String(m.text||"").replace(/\s*\n?\s*[—–-]+\s*N\.O\.V\.A\.?(?:\s*\([^)]*\))?\s*$/,""):m.text)}</div><div class="meta">${k?`<span class="kind ${m.kind==="alerte"?"alerte":""}">${esc(k)}</span>`:""}<span>${m.ts?esc(timeStr(m.ts)):""}</span>${nova&&"speechSynthesis" in window?`<button class="linkbtn" data-say="${esc(m.id)}">Écouter</button>`:""}</div></div>`;
+  return `<div class="msg ${nova?"m-nova":"m-joka"}" data-ts="${+m.ts||0}"><div class="bubble">${md(m.role==="nova"?String(m.text||"").replace(/\s*\n?\s*[—–-]+\s*N\.O\.V\.A\.?(?:\s*\([^)]*\))?\s*$/,""):m.text)}</div><div class="meta">${k?`<span class="kind ${m.kind==="alerte"?"alerte":""}">${esc(k)}</span>`:""}<span>${m.ts?esc(timeStr(m.ts)):""}</span>${nova&&"speechSynthesis" in window?`<button class="linkbtn" data-say="${esc(m.id)}">Écouter</button>`:""}</div></div>`;
 }
 
 /* ---------- onglet Planning ---------- */

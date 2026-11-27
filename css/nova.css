@@ -341,3 +341,16 @@ body.clavier .convo{bottom:var(--clavier,0px)}
   .tdb-t:hover,.module:hover{filter:brightness(1.12)}
   .tabbar button:hover{color:var(--text)}
 }
+
+/* bouton « Arrêter » (visible seulement quand N.O.V.A travaille) */
+.arreter{position:fixed;left:50%;transform:translateX(-50%);top:calc(var(--top-h) + env(safe-area-inset-top,0px) + 10px);z-index:35;display:flex;align-items:center;gap:8px;min-height:44px;padding:0 18px;border:1px solid rgba(240,91,255,.55);border-radius:22px;background:rgba(18,12,31,.92);color:var(--text);font:600 15px var(--f-ui);box-shadow:0 0 18px rgba(139,46,255,.35);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);touch-action:manipulation}
+.arreter[hidden]{display:none}
+.arreter i{width:11px;height:11px;border-radius:2px;background:var(--magenta)}
+.arreter:active{transform:translateX(-50%) scale(.96)}
+.arreter:focus-visible{outline:2px solid var(--lilas);outline-offset:2px}
+/* apparition progressive d'une nouvelle réponse */
+@property --rv{syntax:"<percentage>";inherits:false;initial-value:115%}
+@media (prefers-reduced-motion:no-preference){
+  #v1hote .msg.neuf .bubble{-webkit-mask-image:linear-gradient(180deg,#000 calc(var(--rv) - 15%),transparent var(--rv));mask-image:linear-gradient(180deg,#000 calc(var(--rv) - 15%),transparent var(--rv));animation:devoile var(--d,1.2s) cubic-bezier(.2,.7,.3,1) both}
+}
+@keyframes devoile{from{--rv:0%}to{--rv:115%}}
