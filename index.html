@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#08060D">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="N.O.V.A">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="N.O.V.A, l'agent de vie personnel de Joka.">
+<title>N.O.V.A</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icone-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="apple-touch-startup-image" href="icons/splash-1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)">
+<link rel="preload" href="fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/space-grotesk-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/v1.css">
+<link rel="stylesheet" href="css/nova.css">
+</head>
+<body>
+<div class="appli">
+  <header class="barre" id="barre">
+    <button class="retour" id="retour" type="button"></button>
+    <canvas id="noyau-mini" aria-hidden="true"></canvas>
+    <span class="marque">N.O.V.A</span>
+    <span class="etat" id="barre-etat" aria-live="polite"></span>
+    <h1 class="titre-module" id="barre-titre"></h1>
+    <span class="reseau" id="reseau" role="status"></span>
+  </header>
+  <main id="ecran">
+    <section class="espace" id="esp-accueil" aria-label="Accueil"></section>
+    <section class="espace" id="esp-chat" aria-label="Chat" hidden></section>
+    <section class="espace" id="esp-memoire" aria-label="Mémoire" hidden></section>
+    <section class="espace" id="esp-labo" aria-label="Labo" hidden></section>
+    <section class="espace" id="esp-outils" aria-label="Outils" hidden></section>
+    <section class="espace" id="esp-module" aria-label="Module" hidden></section>
+    <div id="v1parking" hidden><div id="v1hote" hidden><div id="app"></div></div></div>
+  </main>
+  <nav class="onglets" id="onglets" aria-label="Espaces"></nav>
+</div>
+<noscript><p style="padding:24px">N.O.V.A a besoin de JavaScript pour fonctionner.</p></noscript>
+<script id="state" type="application/json">{"prio":{"pro":2,"zan":1,"nova":1},"blocks":[]}</script>
+<script src="vendor/jspdf.umd.min.js" defer></script>
+<script src="js/store.js" defer></script>
+<script src="js/shim.js" defer></script>
+<script src="js/coeur.js" defer></script>
+<script src="js/cerveau.js" defer></script>
+<script src="js/agent.js" defer></script>
+<script src="js/sauvegarde.js" defer></script>
+<script src="js/evolution.js" defer></script>
+<script src="js/shell.js" defer></script>
+</body>
+</html>
