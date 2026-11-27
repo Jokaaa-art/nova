@@ -98,6 +98,33 @@
     for (const re of pref) { const m = gratuits.find((n) => re.test(n)); if (m) return m; }
     return gratuits[0] || "meta-llama/llama-3.3-70b-instruct:free";
   }
+  /* modèles à essayer dans l'ordre si le premier est refusé (quota à 0, modèle retiré…) */
+  const SECOURS = {
+    gemini: ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.0-flash-lite"],
+    groq: ["llama-3.3-70b-versatile", "openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.1-8b-instant"],
+    openrouter: ["meta-llama/llama-3.3-70b-instruct:free", "deepseek/deepseek-chat-v3-0324:free", "google/gemma-3-27b-it:free", "mistralai/mistral-small-3.2-24b-instruct:free"],
+  };
+  function candidats(f, liste, premier) {
+    const out = []; const add = (m) => { if (m && !out.includes(m)) out.push(m); };
+    add(premier); add(choisir(f, liste || []));
+    SECOURS[f].forEach((m) => { if (!liste || !liste.length || liste.includes(m)) add(m); });
+    return out.slice(0, 5);
+  }
+  /* traduit une erreur technique en phrase claire pour Joka */
+  function expliquer(e, f) {
+    const m = String((e && e.message) || e || "");
+    if (e && (e.name === "TypeError" || /load failed|failed to fetch|networkerror/i.test(m))) {
+      return f === "groq" ? "Groq bloque les appels venant d'une appli web (sécurité du navigateur). Cette clé ne peut pas marcher ici : garde Gemini ou OpenRouter."
+        : "l'appel a été bloqué avant d'arriver (réseau coupé ou blocage du navigateur). Vérifie ta connexion et réessaie.";
+    }
+    if (/api key not valid|invalid api key|invalid_api_key|incorrect api key|unauthorized|401/i.test(m) || (e && (e.status === 401))) return "clé refusée : recopie-la en entier, sans espace avant ou après.";
+    if (e && e.status === 403) return "clé sans accès à ce service (403) : vérifie qu'elle est bien active sur le site du fournisseur.";
+    if (/data policy|no endpoints found/i.test(m)) return "OpenRouter bloque les modèles gratuits : sur openrouter.ai, Settings → Privacy, autorise les « free endpoints », puis réessaie.";
+    if (/location is not supported|not available in your country/i.test(m)) return "service indisponible depuis ton pays avec cette clé.";
+    if (e && e.status === 429 || /quota|rate limit|resource_exhausted/i.test(m)) return "quota gratuit atteint pour ce modèle (réessaie plus tard, j'essaie aussi un autre modèle).";
+    if (e && e.status === 404) return "modèle introuvable chez ce fournisseur (j'en essaie un autre).";
+    return m.slice(0, 160) || "erreur inconnue";
+  }
   async function modeleDe(f) {
     const c = await config();
     if (c.modeles[f]) return c.modeles[f];
@@ -158,19 +185,24 @@
     const opts = Object.assign({ temperature: c.temperature }, o);
     let derniere;
     for (const f of liste) {
-      const { signal, fin } = signalAvecDelai(o.signal, o.delai || 90000);
-      const t0 = performance.now();
-      try {
-        const modele = await modeleDe(f);
-        const r = f === "gemini" ? await appelGemini(c.cles[f], modele, opts, signal) : await appelOpenAI(f, c.cles[f], modele, opts, signal);
-        fin(); await noter(f, true, performance.now() - t0);
-        if (!r.texte) throw Object.assign(new Error("réponse vide"), { code: "service" });
-        return Object.assign(r, { fournisseur: f, modele });
-      } catch (e) {
-        fin(); derniere = e;
-        if (o.signal && o.signal.aborted) throw Object.assign(new Error("annulé"), { code: "cancelled" });
-        await noter(f, false, 0, e.message);
-        if (e.status === 404) { c.modeles[f] = ""; await regler({ modeles: c.modeles }); }
+      const premier = await modeleDe(f);
+      const essais = candidats(f, null, premier).slice(0, 3);
+      for (const modele of essais) {
+        const { signal, fin } = signalAvecDelai(o.signal, o.delai || 90000);
+        const t0 = performance.now();
+        try {
+          const r = f === "gemini" ? await appelGemini(c.cles[f], modele, opts, signal) : await appelOpenAI(f, c.cles[f], modele, opts, signal);
+          fin(); await noter(f, true, performance.now() - t0);
+          if (!r.texte) throw Object.assign(new Error("réponse vide"), { code: "service" });
+          if (modele !== premier) { c.modeles[f] = modele; await regler({ modeles: c.modeles }); }
+          return Object.assign(r, { fournisseur: f, modele });
+        } catch (e) {
+          fin(); derniere = Object.assign(e, { message: FOURNISSEURS[f].nom.split(" ")[0] + " : " + expliquer(e, f) });
+          if (o.signal && o.signal.aborted) throw Object.assign(new Error("annulé"), { code: "cancelled" });
+          await noter(f, false, 0, e.message);
+          /* on ne change de modèle que si le problème vient du modèle (quota, introuvable) */
+          if (!(e.status === 429 || e.status === 404 || e.status === 400 && !/api key/i.test(e.message))) break;
+        }
       }
     }
     throw Object.assign(new Error("aucun cerveau n'a répondu : " + (derniere ? derniere.message : "?")), { code: (derniere && derniere.code) || "service" });
@@ -201,7 +233,7 @@
       const r = await demander(Object.assign({}, o || {}, { prompt: String(prompt) + "\n\nRéponds uniquement avec un objet JSON valide.", json: true, images: imagesDe(o) }));
       return lireJSON(r.texte);
     },
-    demander, lireJSON,
+    demander, lireJSON, expliquer,
     async recherche(question, o) {
       try { return await demander(Object.assign({}, o || {}, { prompt: question, web: true })); }
       catch (e) {
@@ -212,16 +244,27 @@
     },
     wikipedia,
     async tester(f) {
-      const c = await config(); if (!c.cles[f]) return { ok: false, erreur: "pas de clé" };
-      const t0 = performance.now();
-      try {
-        const liste = await modeles(f, c.cles[f]);
-        const m = choisir(f, liste); c.modeles[f] = m; await regler({ modeles: c.modeles });
+      const c = await config(); if (!c.cles[f]) return { ok: false, erreur: "pas de clé enregistrée" };
+      const t0 = performance.now(); const essais = [];
+      let liste = [];
+      try { liste = await modeles(f, c.cles[f]); }
+      catch (e) {
+        const x = expliquer(e, f); await noter(f, false, 0, x);
+        if (e.name === "TypeError" || /load failed|failed to fetch/i.test(e.message) || e.status === 401 || e.status === 403 || /api key/i.test(e.message)) return { ok: false, erreur: x, essais };
+      }
+      for (const m of candidats(f, liste)) {
         const { signal, fin } = signalAvecDelai(null, 30000);
-        const r = f === "gemini" ? await appelGemini(c.cles[f], m, { prompt: "Réponds juste : OK", temperature: 0 }, signal) : await appelOpenAI(f, c.cles[f], m, { prompt: "Réponds juste : OK", temperature: 0 }, signal);
-        fin(); const ms = Math.round(performance.now() - t0); await noter(f, true, ms);
-        return { ok: /ok/i.test(r.texte), modele: m, ms, texte: r.texte.slice(0, 40) };
-      } catch (e) { await noter(f, false, 0, e.message); return { ok: false, erreur: e.message }; }
+        try {
+          const r = f === "gemini" ? await appelGemini(c.cles[f], m, { prompt: "Réponds juste : OK", temperature: 0, max: 64 }, signal) : await appelOpenAI(f, c.cles[f], m, { prompt: "Réponds juste : OK", temperature: 0, max: 64 }, signal);
+          fin(); const ms = Math.round(performance.now() - t0); await noter(f, true, ms);
+          c.modeles[f] = m; await regler({ modeles: c.modeles });
+          return { ok: true, modele: m, ms, texte: r.texte.slice(0, 40), essais, autorise: c.autorise };
+        } catch (e) {
+          fin(); const x = expliquer(e, f); essais.push({ modele: m, erreur: x }); await noter(f, false, 0, x);
+          if (e.name === "TypeError" || e.status === 401 || e.status === 403 || /api key/i.test(e.message) || /data policy/i.test(e.message)) return { ok: false, erreur: x, essais };
+        }
+      }
+      return { ok: false, erreur: essais.length ? essais[essais.length - 1].erreur : "aucun modèle n'a répondu", essais };
     },
     async stats() { return (await S.kvLire("stats_cerveau")) || {}; },
   };

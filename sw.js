@@ -1,6 +1,6 @@
 /* N.O.V.A — service worker : l'appli marche sans Internet, les fichiers « _blob/<id> » viennent du téléphone,
    et une nouvelle version n'est activée que quand Joka touche « Mettre à jour ». */
-const VERSION = "nova-2.2.2";
+const VERSION = "nova-2.3.0";
 const COQUE = [
   "./", "index.html", "manifest.webmanifest",
   "css/v1.css", "css/nova.css",

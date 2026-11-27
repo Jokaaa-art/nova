@@ -47,19 +47,20 @@
     async config() { return Object.assign({ serveur: "https://ntfy.sh", sujet: "", actif: false }, (await S.kvLire("ntfy")) || {}); },
     async regler(m) { const c = Object.assign(await this.config(), m); if (!c.sujet) c.sujet = "nova-" + Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(36).padStart(2, "0")).join("").slice(0, 20); await S.kvMettre("ntfy", c); return c; },
     /* texte sans montant ni détail privé : il passe par le serveur public ntfy */
-    async envoyer({ titre, texte, a, tags }) {
+    async envoyer({ titre, texte, a, tags, test }) {
       const c = await this.config();
-      if (!c.actif || !c.sujet) return { ok: false, raison: "notifications pas activées" };
+      if (!c.sujet) return { ok: false, raison: "pas encore de sujet (ouvre Plus → Notifications)" };
+      if (!c.actif && !test) return { ok: false, raison: "notifications pas activées" };
       if (!navigator.onLine) return { ok: false, raison: "hors connexion" };
       /* publication JSON : accents permis, pas d'en-têtes spéciaux */
       const corps = { topic: c.sujet, title: String(titre || "N.O.V.A").slice(0, 80), message: String(texte || "").slice(0, 400), tags: [tags || "crystal_ball"], click: location.href.split("#")[0] };
       if (a && a > Date.now() + 60000) corps.delay = String(Math.floor(Math.min(a, Date.now() + 3 * 864e5 - 60000) / 1000));
       try {
         const r = await fetch(c.serveur.replace(/\/$/, "") + "/", { method: "POST", body: JSON.stringify(corps) });
-        if (!r.ok) return { ok: false, raison: "ntfy " + r.status };
+        if (!r.ok) return { ok: false, raison: r.status === 429 ? "trop d'envois, réessaie dans une minute" : "le serveur ntfy a répondu " + r.status };
         await NovaJournal.ajouter("notification", (a ? "Notification prévue : " : "Notification envoyée : ") + (titre || ""));
         return { ok: true };
-      } catch (e) { return { ok: false, raison: e.message }; }
+      } catch (e) { return { ok: false, raison: /load failed|failed to fetch/i.test(e.message) ? "envoi bloqué (pas d'Internet ?)" : e.message }; }
     },
   };
   window.NovaNtfy = NovaNtfy;

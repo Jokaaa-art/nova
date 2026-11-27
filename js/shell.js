@@ -202,7 +202,7 @@
     else if (a.etat === "erreur") { dot = "bad"; txt = "Erreur"; }
     else if (et.code === "ok") { dot = "ok"; txt = "En ligne"; }
     else if (et.code === "autorisation") { dot = "att"; txt = "À autoriser"; }
-    $("pill-dot").className = "dot " + dot; $("pill-text").textContent = txt;
+    $("pill-dot").className = "voyant " + dot; $("pill-text").textContent = txt;
     const st = $("st-label"); if (st) st.textContent = a.nom;
     const ph = $("phrase-etat"); if (ph) { const v = V1(); ph.textContent = a.etat === "veille" && v ? v.ligneEtat() : a.phrase; }
   }
@@ -226,11 +226,11 @@
           <canvas id="coreCv" aria-hidden="true"></canvas>
           <canvas id="core3d" aria-hidden="true"></canvas>
           <button class="noyau-touche" id="noyau-touche" type="button" aria-label="Toucher le noyau pour parler à N.O.V.A"></button>
-          <div class="mark"><h1 class="w">N.O.V.A</h1><div class="s">AGENT DE VIE</div><div class="st"><i class="dot"></i><span id="st-label">En veille</span></div></div>
+          <div class="mark"><h1 class="w">N.O.V.A</h1><div class="s">AGENT DE VIE</div><div class="st"><i class="voyant"></i><span id="st-label">En veille</span></div></div>
         </section>
         <p class="phrase-etat" id="phrase-etat" aria-live="polite"></p>
         <div id="acc-bienvenue"></div>
-        <section class="panel" style="--i:1" aria-labelledby="acc-db-t"><div class="in"><div class="ph">${ic("accueil")}<h2 id="acc-db-t">Tableau de bord</h2><span class="meta" id="acc-date"></span></div><div class="dash" id="dash"></div></div></section>
+        <section class="panel" style="--i:1" aria-labelledby="acc-db-t"><div class="in"><div class="ph">${ic("accueil")}<h2 id="acc-db-t">Tableau de bord</h2><span class="meta" id="acc-date"></span></div><div class="tdb" id="dash"></div></div></section>
         <section class="panel" style="--i:2" aria-labelledby="acc-tt-t"><div class="in"><div class="ph">${ic("ranger")}<h2 id="acc-tt-t">À traiter</h2><button class="btn ghost" style="margin-left:auto;min-height:36px" data-act="reveil">Réveiller N.O.V.A</button></div><div id="acc-traiter" class="liste"><div class="squelette"></div></div></div></section>
         <section class="panel" style="--i:3" aria-labelledby="acc-op-t"><div class="in"><div class="ph">${ic("auto")}<h2 id="acc-op-t">Activités de N.O.V.A</h2></div><div id="acc-ops" class="liste"><div class="squelette"></div></div></div></section>
         <section class="panel" style="--i:4" aria-labelledby="acc-sys-t"><div class="in"><div class="ph">${ic("cerveau")}<h2 id="acc-sys-t">Système</h2></div><div id="acc-sys"><div class="squelette"></div></div></div></section>`;
@@ -258,7 +258,7 @@
   }
   function tuile(id, icone, titre, corps, opts) {
     opts = opts || {};
-    return `<button class="dash-t${opts.large ? " large" : ""}" data-ouvrir="${id}" style="--i:${opts.i || 0}"><span><span class="h">${ic(icone)}${esc(titre)}${opts.n ? `<span class="n">${esc(opts.n)}</span>` : ""}</span>${corps}</span></button>`;
+    return `<button class="tdb-t${opts.large ? " large" : ""}" data-ouvrir="${id}" style="--i:${opts.i || 0}"><span><span class="h">${ic(icone)}${esc(titre)}${opts.n ? `<span class="n">${esc(opts.n)}</span>` : ""}</span>${corps}</span></button>`;
   }
   function rendreDash() {
     const v = V1(); const d = $("dash"); if (!d) return;
@@ -572,7 +572,9 @@
           <div class="champ"><label for="cv-${f}">Clé ${esc(F[f].nom.split(" ")[0])}</label><input id="cv-${f}" type="password" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" value="${esc(c.cles[f] || "")}" placeholder="Colle ta clé ici"></div>
           <p class="sous" style="margin-top:8px">${lien(F[f].cle, "Obtenir une clé gratuite")}</p><p class="sous">${[c.modeles[f] ? "Modèle : " + esc(c.modeles[f]) : "", F[f].images ? "lit les images" : "", F[f].recherche ? "cherche sur le web" : ""].filter(Boolean).join(", ")}</p>
           <div class="rangee" style="margin-top:var(--e-3)"><button class="btn" data-cv="sauver" data-f="${f}">Enregistrer</button><button class="btn" data-cv="tester" data-f="${f}">Tester</button>${c.cles[f] ? `<button class="btn danger" data-cv="effacer" data-f="${f}">Effacer la clé</button>` : ""}</div>
+          ${f === "groq" ? `<p class="sous" style="margin-top:8px">Groq bloque souvent les appels venant d'une appli web : si le test échoue, ce n'est pas ta faute, Gemini ou OpenRouter suffisent.</p>` : ""}
           <p class="sous" id="cv-r-${f}" role="status" style="margin-top:8px"></p></section>`).join("")}
+        <section class="carte"><h2>Tout vérifier</h2><p class="sous">Teste toutes tes clés d'un coup et te dit laquelle marche.</p><div class="rangee" style="margin-top:12px"><button class="btn" data-cv="tout">Tester toutes mes clés</button></div><div id="cv-tout" class="liste" style="margin-top:8px"></div></section>
         <p class="sous">Ordre d'essai : le 1 d'abord, puis les autres si le premier ne répond pas. Le Labo peut changer cet ordre tout seul s'il mesure qu'un autre marche mieux chez toi (et l'annule si c'est pire).</p>`;
       p.onclick = async (e) => {
         if (e.target.closest("#cv-ok")) {
@@ -581,13 +583,28 @@
           await NovaJournal.ajouter("securite", on ? "Cerveau en ligne autorisé par Joka" : "Cerveau en ligne coupé par Joka"); majTout(); return;
         }
         const b = e.target.closest("[data-cv]"); if (!b) return; const f = b.dataset.f; const out = $("cv-r-" + f);
+        if (b.dataset.cv === "tout") {
+          const zone = $("cv-tout"); const cfgT = await NovaCerveau.config(); b.disabled = true;
+          zone.innerHTML = `<div class="squelette"></div>`; const lignes = [];
+          for (const k of cfgT.ordre) {
+            if (!cfgT.cles[k]) { lignes.push([NovaCerveau.FOURNISSEURS[k].nom, "pas de clé", ""]); continue; }
+            const r = await NovaCerveau.tester(k);
+            lignes.push([NovaCerveau.FOURNISSEURS[k].nom, r.ok ? "marche (" + r.modele + ")" : r.erreur, r.ok ? "ok" : "err"]);
+          }
+          const auto = (await NovaCerveau.config()).autorise;
+          zone.innerHTML = lignes.map(([n, t, e]) => `<div class="el"><div class="t"><b>${esc(n)}</b><small${e ? ` style="color:var(--${e === "ok" ? "ok" : "crit"})"` : ""}>${esc(t)}</small></div></div>`).join("")
+            + `<div class="el"><div class="t"><b>Autorisation</b><small style="color:var(--${auto ? "ok" : "warn"})">${auto ? "allumée" : "éteinte : allume « Autoriser le cerveau en ligne » en haut"}</small></div></div>`;
+          b.disabled = false; await NovaJournal.ajouter("cerveau", "Test de toutes les clés : " + lignes.filter((l) => l[2] === "ok").length + " qui marche(nt)"); majTout(); return;
+        }
         const cfg = await NovaCerveau.config();
         if (b.dataset.cv === "sauver" || b.dataset.cv === "tester") {
           const v = $("cv-" + f).value.trim(); if (v !== (cfg.cles[f] || "")) { cfg.cles[f] = v; cfg.modeles[f] = ""; await NovaCerveau.regler({ cles: cfg.cles, modeles: cfg.modeles }); }
           if (b.dataset.cv === "sauver") { out.textContent = v ? "Clé enregistrée dans ton téléphone." : "Clé vide."; majTout(); return; }
           out.textContent = "Test en cours…"; b.disabled = true;
           const r = await NovaCerveau.tester(f); b.disabled = false;
-          out.textContent = r.ok ? `Ça marche : ${r.modele}, réponse en ${r.ms} ms.` : "Échec : " + r.erreur;
+          const cfg2 = await NovaCerveau.config();
+          out.innerHTML = r.ok ? `<span style="color:var(--ok)">Ça marche</span> : modèle ${esc(r.modele)}, réponse en ${r.ms} ms.${cfg2.autorise ? "" : " <b>Allume maintenant « Autoriser le cerveau en ligne » tout en haut.</b>"}`
+            : `<span style="color:var(--crit)">Ça ne marche pas</span> : ${esc(r.erreur)}${r.essais && r.essais.length > 1 ? ` (${r.essais.length} modèles essayés)` : ""}`;
           await NovaJournal.ajouter("cerveau", `Test ${f} : ${r.ok ? "OK (" + r.ms + " ms)" : "échec"}`); majTout();
         } else if (b.dataset.cv === "effacer") {
           if (!confirm("Effacer cette clé du téléphone ?")) return;
@@ -634,7 +651,7 @@
       p.innerHTML = `<section class="carte"><h2>Rappels par ntfy</h2><p class="sous">L'appli ne tourne pas en fond sur iPhone. Pour être prévenu (check-in, bilan), elle confie tes rappels à l'heure prévue à ntfy, une appli gratuite. Le texte des rappels reste général : aucun montant, aucun détail privé.</p>
         <div class="liste" style="margin-top:var(--e-3)">
           <div class="el"><div class="t"><b>1. Installe ntfy</b><small>${lien("https://apps.apple.com/search?term=ntfy", "Chercher ntfy dans l'App Store")}</small></div></div>
-          <div class="el"><div class="t"><b>2. Dans ntfy, touche + et abonne-toi à ce sujet</b><small class="mono" id="nt-sujet" style="user-select:all;-webkit-user-select:all">${esc(c.sujet)}</small></div><button class="btn" data-nt="copier">Copier</button></div>
+          <div class="el"><div class="t"><b>2. Dans ntfy : touche +, colle ce nom, touche Subscribe, et autorise les notifications</b><small class="mono" id="nt-sujet" style="user-select:all;-webkit-user-select:all">${esc(c.sujet)}</small></div><button class="btn" data-nt="copier">Copier</button></div>
           <div class="el"><div class="t"><b>3. Active ici et envoie un test</b><small>Serveur : ${esc(c.serveur)}</small></div>${interrupteur("nt-on", c.actif, "Activer les rappels ntfy")}</div>
         </div>
         <div class="rangee" style="margin-top:var(--e-3)"><button class="btn principal" data-nt="test">Envoyer un test</button></div><p class="sous" id="nt-r" role="status" style="margin-top:8px"></p></section>
@@ -643,7 +660,7 @@
         if (e.target.closest("#nt-on")) { const cur = await NovaNtfy.config(); const on = !cur.actif; await NovaNtfy.regler({ actif: on }); $("nt-on").setAttribute("aria-checked", String(on)); await NovaJournal.ajouter("securite", on ? "Rappels ntfy activés" : "Rappels ntfy coupés"); if (on) await NovaAgent.planifierRituels(); majTout(); return; }
         const b = e.target.closest("[data-nt]"); if (!b) return;
         if (b.dataset.nt === "copier") { try { await navigator.clipboard.writeText(c.sujet); toast("Sujet copié."); } catch (er) { toast("Sélectionne le sujet et copie-le."); } }
-        if (b.dataset.nt === "test") { const r = await NovaNtfy.envoyer({ titre: "Test N.O.V.A", texte: "Si tu lis ça, les rappels marchent.", tags: "white_check_mark" }); $("nt-r").textContent = r.ok ? "Envoyé. Regarde ton téléphone." : "Pas envoyé : " + r.raison; }
+        if (b.dataset.nt === "test") { const r = await NovaNtfy.envoyer({ titre: "Test N.O.V.A", texte: "Si tu lis ça, les rappels marchent.", tags: "white_check_mark", test: true }); $("nt-r").textContent = r.ok ? "Envoyé à ntfy. Tu dois recevoir « Test N.O.V.A » dans quelques secondes. Rien ? Vérifie que tu es abonné au bon sujet dans l'appli ntfy et que ses notifications sont autorisées (Réglages iPhone → ntfy → Notifications)." : "Pas envoyé : " + r.raison; }
       };
     },
     async automatisations(p) {
