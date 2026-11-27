@@ -822,13 +822,16 @@
     NovaEvolution.demarrer();
     majTout();
     enregistrerSW();
+    /* le tableau de bord suit les données même quand l'onglet concerné n'est pas ouvert */
+    setTimeout(() => { if (E.route.espace === "accueil") rendreDash(); }, 2000);
+    setInterval(() => { if (E.route.espace === "accueil" && !document.hidden) rendreDash(); }, 20000);
     /* clavier iOS : la barre d'écriture reste visible au-dessus */
     if (window.visualViewport) {
       const f = () => { const k = Math.max(0, innerHeight - visualViewport.height - visualViewport.offsetTop); document.documentElement.style.setProperty("--clavier", k + "px"); document.body.classList.toggle("clavier", k > 80); };
       visualViewport.addEventListener("resize", f); visualViewport.addEventListener("scroll", f);
     }
   }
-  let trT = 0; function majTraiterDiffere() { clearTimeout(trT); trT = setTimeout(() => { if (E.route.espace === "accueil") accTraiter(); }, 600); }
+  let trT = 0; function majTraiterDiffere() { clearTimeout(trT); trT = setTimeout(() => { if (E.route.espace === "accueil") { accTraiter(); rendreDash(); } }, 600); }
 
   /* ---------- mises à jour du code : toujours avec l'accord de Joka ---------- */
   function enregistrerSW() {
