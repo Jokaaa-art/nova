@@ -53,26 +53,29 @@
     if (opts.mode === "remplacer") await S.toutEffacer();
     let ecrits = 0, gardes = 0, fusionnes = 0, n = 0; const erreurs = [];
     const total = lu.total + lu.fichiers.length;
-    const ecrire = async (chemin, data, fiche) => {
-      const loc = S.tous(chemin).find((d) => d.path === chemin);
-      if (loc && opts.mode !== "remplacer" && (loc.data.ts || 0) > (data.ts || 0)) {
+    const existants = new Map(S.tous(B).map((d) => [d.path, d.data]));
+    const lot = [];
+    const ecrire = (chemin, data, fiche) => {
+      const loc = existants.get(chemin);
+      if (loc && opts.mode !== "remplacer" && (loc.ts || 0) > (data.ts || 0)) {
         /* une fiche (nova, memoire…) : on fusionne, la version locale plus récente gagne champ par champ */
-        if (fiche) { await S.ecrireBrut(chemin, Object.assign({}, data, loc.data)); ecrits++; fusionnes++; return; }
+        if (fiche) { lot.push([chemin, Object.assign({}, data, loc)]); fusionnes++; return; }
         gardes++; return;
       }
-      await S.ecrireBrut(chemin, data); ecrits++;
+      lot.push([chemin, data]);
     };
-    for (const [d, data] of lu.docs) {
-      try { await ecrire(B + d, data, true); } catch (e) { erreurs.push(d + " : " + e.message); }
-      if (++n % 20 === 0) prog(n / total);
-    }
+    for (const [d, data] of lu.docs) { try { ecrire(B + d, data, true); } catch (e) { erreurs.push(d + " : " + e.message); } }
     for (const [c, l] of lu.cols) {
       if (!/^[\w\-]+(\/[\w\-]+\/[\w\-]+)*\/?[\w\-]*$/.test(c)) { erreurs.push("collection ignorée : " + c); continue; }
       for (const x of l) {
-        try { if (!/^[\w\-.]+$/.test(x.id)) throw new Error("identifiant invalide"); await ecrire(B + c + "/" + x.id, x.data); }
-        catch (e) { erreurs.push(c + "/" + x.id + " : " + e.message); }
-        if (++n % 20 === 0) { prog(n / total); await new Promise((r) => setTimeout(r, 0)); }
+        if (!/^[\w\-.]+$/.test(x.id)) { erreurs.push(c + "/" + x.id + " : identifiant invalide"); continue; }
+        ecrire(B + c + "/" + x.id, x.data);
       }
+    }
+    for (let i = 0; i < lot.length; i += 150) {
+      const part = lot.slice(i, i + 150);
+      try { await S.ecrireLot(part); ecrits += part.length; } catch (e) { erreurs.push("écriture : " + e.message); }
+      n += part.length; prog(n / total); await new Promise((r) => setTimeout(r, 0));
     }
     let fichiersOk = 0;
     for (const [id, f] of lu.fichiers) {

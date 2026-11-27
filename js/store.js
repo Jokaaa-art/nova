@@ -108,6 +108,14 @@
     changement(path);
     await tx("docs", "readwrite", (s) => s.put(d));
   }
+  /* plusieurs documents en une seule transaction, une seule notification (import) */
+  async function ecrireLot(liste) {
+    await ouvrir();
+    const ds = liste.map(([path, data]) => ({ path, parent: parentDe(path), id: idDe(path), data: clone(data), updatedAt: Date.now() }));
+    ds.forEach((d) => docs.set(d.path, d));
+    await tx("docs", "readwrite", (s) => { ds.forEach((d) => s.put(d)); });
+    ds.forEach((d) => changement(d.path));
+  }
   async function effacer(path) {
     await ouvrir();
     docs.delete(path);
@@ -222,6 +230,6 @@
   window.NovaStore = {
     ouvrir, doc: (p) => new DocRef(p), collection: (p) => new Query(p),
     blobMettre, blobLire, blobEffacer, blobsListe, kvLire, kvMettre,
-    tous, compter, toutEffacer, stockage, demanderPersistance, ecrireBrut: ecrire,
+    tous, compter, toutEffacer, stockage, demanderPersistance, ecrireBrut: ecrire, ecrireLot,
   };
 })();
