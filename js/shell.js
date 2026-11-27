@@ -64,6 +64,7 @@
     { id: "sauvegarde", nom: "Sauvegarde", groupe: "sys", ic: "sauvegarde" },
     { id: "fichiers", nom: "Fichiers", groupe: "sys", ic: "fichiers" },
     { id: "securite", nom: "Sécurité", groupe: "sys", ic: "securite" },
+    { id: "barre", nom: "Barre du bas", groupe: "sys", ic: "menu" },
   ];
   const ONGLETS = () => MODULES.filter((m) => m.groupe === "vie");
   function ouvrirModule(id) { const m = MOD[id]; if (!m) return; if (m.vers) aller(m.vers[0], m.vers[1]); else aller("outils", m.id); }
@@ -102,15 +103,33 @@
   }
   let derniereVue = "";
   /* barre du bas : Accueil, Chat, Planning, Budget, Plus (comme ORACLE) */
-  const BAS = [["accueil", "Accueil", "accueil"], ["chat", "Chat", "chat"], ["planning", "Planning", "planning"], ["budget", "Budget", "budget"], ["plus", "Plus", "menu"]];
-  function basActif(r) { if (r.espace === "accueil") return "accueil"; if (r.espace === "chat") return "chat"; if (r.espace === "outils" && (r.sous === "planning" || r.sous === "budget")) return r.sous; return "plus"; }
+  /* barre du bas : Accueil, 3 emplacements choisis par Joka, Plus (comme ORACLE) */
+  const BARRE_DEFAUT = ["discuter", "planning", "budget"];
+  const EXTRAS = [{ id: "x-memoire", nom: "Mémoire réseau", ic: "memoire" }, { id: "x-labo", nom: "Labo", ic: "labo" }, { id: "outils", nom: "Outils", ic: "outils" }];
+  const CHOIX_BARRE = () => MODULES.concat(EXTRAS);
+  const choix = (id) => CHOIX_BARRE().find((m) => m.id === id);
+  function ouvrirCle(id) { if (id === "accueil") aller("accueil"); else if (id === "x-memoire") aller("memoire"); else if (id === "x-labo") aller("labo"); else if (id === "outils") aller("outils"); else ouvrirModule(id); }
+  function cleRoute(r) {
+    if (r.espace === "accueil") return "accueil"; if (r.espace === "chat") return "discuter"; if (r.espace === "labo") return "x-labo";
+    if (r.espace === "memoire") return r.sous === "sait" ? "memoire" : r.sous === "docs" ? "docs" : "x-memoire";
+    if (r.espace === "outils") return r.sous || "outils"; return "";
+  }
+  function basActif(r) { const k = cleRoute(r); return k === "accueil" || (E.barre || BARRE_DEFAUT).includes(k) ? k : "plus"; }
+  function construireBarre() {
+    const ids = (E.barre || BARRE_DEFAUT).filter((id) => choix(id)).slice(0, 3);
+    const items = [["accueil", "Accueil", "accueil"]].concat(ids.map((id) => { const m = choix(id); return [id, m.id === "discuter" ? "Chat" : m.nom, m.ic]; }), [["plus", "Plus", "menu"]]);
+    $("tabbar").innerHTML = items.map(([k, t, icone]) => `<button type="button" data-bas="${k}" aria-current="false"${k === "plus" ? ' aria-haspopup="dialog" aria-expanded="false"' : ""}>${ic(icone)}<span class="lib">${esc(t)}</span>${k === "plus" ? '<span class="badge" hidden></span>' : k === "ranger" ? '<span class="badge" data-compte="ranger" hidden></span>' : ""}</button>`).join("");
+    const r = lireRoute(); const actif = basActif(r);
+    document.querySelectorAll("#tabbar button").forEach((b) => b.setAttribute("aria-current", b.dataset.bas === actif ? "page" : "false"));
+    majCompteurs();
+  }
   const INFOS = {
     chat: ["Discuter", "Écris ou parle : N.O.V.A te répond ici."], memoire: ["Mémoire", "Ce qu'elle sait de toi, d'où ça vient, ce que tu peux changer."],
     labo: ["Labo", "Comment N.O.V.A s'améliore : mesuré, réversible, et c'est toi qui valides."], outils: ["Outils", "Tous tes onglets et les réglages de N.O.V.A."],
     planning: "Ta semaine, tes créneaux et tes limites.", budget: "Ce que tu peux encore dépenser, tes relevés, ton plan.", crypto: "Apprendre, comparer, simuler. Jamais d'achat réel.",
     nutrition: "Ce que tu manges, tes calories et tes recettes.", pesee: "Ta courbe de poids et ta tendance.", sport: "Tes séances et ce qu'elles brûlent.",
     docs: "Les documents que tu donnes à N.O.V.A.", ranger: "Ce que N.O.V.A te propose de ranger, à valider.", reglages: "Tes limites de la semaine et l'export.",
-    cerveau: "Le cerveau en ligne gratuit de N.O.V.A.", web: "Chercher une info sur le web.", voix: "Parler à N.O.V.A et l'entendre.", notifications: "Tes rappels, même appli fermée.",
+    cerveau: "Le cerveau en ligne gratuit de N.O.V.A.", barre: "Choisis les onglets de la barre du bas.", web: "Chercher une info sur le web.", voix: "Parler à N.O.V.A et l'entendre.", notifications: "Tes rappels, même appli fermée.",
     automatisations: "Check-in du matin et bilan du soir.", sauvegarde: "Importer et sauvegarder toutes tes données.", fichiers: "Les fichiers gardés dans ton téléphone.", securite: "Ce que N.O.V.A peut faire seule.",
   };
   function vh(id, titre, texte) {
@@ -162,12 +181,12 @@
   /* ---------- feuille « Plus » : tous les onglets ---------- */
   function construirePlus() {
     const btn = (id, nom, icone, extra) => `<button type="button" data-plus="${id}">${ic(icone)}<span>${esc(nom)}</span>${extra || ""}</button>`;
-    $("plus").innerHTML = `<h2>Tes onglets</h2><div class="grid3">${ONGLETS().map((m) => btn(m.id, m.nom, m.ic, m.id === "ranger" ? `<span class="badge" data-compte="ranger" hidden></span>` : "")).join("")}</div>
+    $("plus").innerHTML = `<div class="plus-tete"><h2>Tes onglets</h2><button type="button" class="btn ghost" data-plus="barre">${ic("menu")}Modifier la barre du bas</button></div><div class="grid3">${ONGLETS().map((m) => btn(m.id, m.nom, m.ic, m.id === "ranger" ? `<span class="badge" data-compte="ranger" hidden></span>` : "")).join("")}</div>
       <h2>N.O.V.A</h2><div class="grid3">${btn("x-memoire", "Mémoire réseau", "memoire")}${btn("x-labo", "Labo", "labo", `<span class="badge" data-compte="labo" hidden></span>`)}${MODULES.filter((m) => m.groupe === "sys").map((m) => btn(m.id, m.nom, m.ic)).join("")}</div>`;
     $("plus").addEventListener("click", (e) => {
       const b = e.target.closest("[data-plus]"); if (!b) return;
       const id = b.dataset.plus;
-      if (id === "x-memoire") aller("memoire"); else if (id === "x-labo") aller("labo"); else ouvrirModule(id);
+      ouvrirCle(id);
     });
   }
   function ouvrirPlus() { $("plus").classList.add("ouvert"); $("voile").classList.add("ouvert"); document.querySelector('#tabbar [data-bas="plus"]').setAttribute("aria-expanded", "true"); }
@@ -523,6 +542,26 @@
   const interrupteur = (id, on, label) => `<button class="interrupteur" role="switch" id="${id}" aria-checked="${on ? "true" : "false"}" aria-label="${esc(label)}"></button>`;
 
   const PANNEAUX = {
+    async barre(p) {
+      const liste = CHOIX_BARRE();
+      const sel = (i) => `<div class="champ"><label for="br-${i}">Emplacement ${i + 2}</label><select id="br-${i}">${liste.map((m) => `<option value="${m.id}"${(E.barre[i] || BARRE_DEFAUT[i]) === m.id ? " selected" : ""}>${esc(m.nom)}</option>`).join("")}</select></div>`;
+      p.innerHTML = `<section class="carte"><h2>Ta barre du bas</h2><p class="sous">Accueil reste à gauche, Plus reste à droite. Choisis les 3 onglets que tu utilises le plus : ils passent au premier plan. Les autres restent dans Plus.</p>
+        <div style="display:grid;gap:12px;margin-top:12px">${sel(0)}${sel(1)}${sel(2)}</div>
+        <div class="rangee" style="margin-top:14px"><button class="btn" data-br="sauver">Enregistrer</button><button class="btn ghost" data-br="defaut">Remettre comme avant</button></div>
+        <p class="sous" id="br-r" role="status" style="margin-top:8px"></p></section>
+        <section class="carte"><h2>Ce que N.O.V.A a vu</h2><p class="sous" id="br-usage">…</p></section>`;
+      const u = (await S.kvLire("usage")) || {};
+      const top = Object.entries(u).filter(([k]) => k.startsWith("module:")).sort((a, b) => (b[1].n || 0) - (a[1].n || 0)).slice(0, 3).map(([k, v]) => { const m = choix(k.slice(7)); return m ? m.nom + " (" + v.n + " fois)" : null; }).filter(Boolean);
+      $("br-usage").textContent = top.length ? "Tes onglets les plus ouverts : " + top.join(", ") + "." : "Pas encore assez d'usage pour te conseiller.";
+      p.onclick = async (e) => {
+        const b = e.target.closest("[data-br]"); if (!b) return;
+        let ids = b.dataset.br === "defaut" ? BARRE_DEFAUT.slice() : [0, 1, 2].map((i) => $("br-" + i).value);
+        if (new Set(ids).size < ids.length) { $("br-r").textContent = "Choisis 3 onglets différents."; return; }
+        E.barre = ids; await S.kvMettre("barre", ids); construireBarre();
+        if (b.dataset.br === "defaut") [0, 1, 2].forEach((i) => { $("br-" + i).value = ids[i]; });
+        $("br-r").textContent = "C'est fait : ta barre du bas est à jour."; NovaJournal.ajouter("interface", "Barre du bas changée par Joka : " + ids.map((id) => choix(id).nom).join(", "));
+      };
+    },
     async cerveau(p) {
       const c = await NovaCerveau.config();
       const F = NovaCerveau.FOURNISSEURS;
@@ -731,11 +770,13 @@
     try { await chargerScript(url); } finally { URL.revokeObjectURL(url); }
   }
   async function demarrer() {
-    $("tabbar").innerHTML = BAS.map(([k, t, icone]) => `<button type="button" data-bas="${k}" aria-current="false"${k === "plus" ? ' aria-haspopup="dialog" aria-expanded="false"' : ""}>${ic(icone)}<span>${t}</span>${k === "plus" ? '<span class="badge" hidden></span>' : ""}</button>`).join("");
+    await S.ouvrir();
+    E.barre = (await S.kvLire("barre")) || BARRE_DEFAUT.slice();
+    construireBarre();
     $("tabbar").addEventListener("click", (e) => {
       const b = e.target.closest("[data-bas]"); if (!b) return; const k = b.dataset.bas;
       if (k === "plus") { $("plus").classList.contains("ouvert") ? fermerPlus() : ouvrirPlus(); return; }
-      if (k === "accueil") aller("accueil"); else if (k === "chat") aller("chat"); else aller("outils", k);
+      ouvrirCle(k);
     });
     construirePlus();
     $("voile").addEventListener("click", fermerPlus);
