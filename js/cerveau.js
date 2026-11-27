@@ -81,41 +81,43 @@
     if (!r.ok) throw await erreurHTTP(r);
     return ((await r.json()).data || []).map((m) => m.id);
   }
-  function choisir(f, liste) {
+  function choisir(f, liste) { return classer(f, liste)[0] || SECOURS[f][0]; }
+  /* range les modèles listés par le fournisseur, du plus sûr au moins sûr */
+  function classer(f, liste) {
+    liste = liste || [];
     const version = (n) => { const m = /(\d+(?:\.\d+)?)/.exec(n); return m ? parseFloat(m[1]) : 0; };
     if (f === "gemini") {
-      const ok = liste.filter((n) => /^gemini-\d/.test(n) && /flash/.test(n) && !/(image|tts|audio|live|embedding|exp|thinking)/.test(n));
-      const stables = ok.filter((n) => !/preview/.test(n));
-      const pool = (stables.length ? stables : ok).sort((a, b) => version(b) - version(a) || (/lite/.test(a) ? 1 : 0) - (/lite/.test(b) ? 1 : 0));
-      return pool[0] || "gemini-2.5-flash";
+      const ok = liste.filter((n) => /flash/.test(n) && /^gemini/.test(n) && !/(image|tts|audio|live|embedding|exp|thinking|native|vision)/.test(n));
+      const alias = ok.filter((n) => /latest$/.test(n)).sort((a, b) => (/lite/.test(a) ? 1 : 0) - (/lite/.test(b) ? 1 : 0));
+      const rest = ok.filter((n) => !/latest$/.test(n)).sort((a, b) => (/preview/.test(a) ? 1 : 0) - (/preview/.test(b) ? 1 : 0) || version(b) - version(a) || (/lite/.test(a) ? 1 : 0) - (/lite/.test(b) ? 1 : 0));
+      return alias.concat(rest);
     }
     if (f === "groq") {
       const pref = ["openai/gpt-oss-120b", "llama-3.3-70b-versatile", "openai/gpt-oss-20b", "llama-3.1-8b-instant"];
-      return pref.find((p) => liste.includes(p)) || liste.find((n) => !/(whisper|guard|tts|orpheus|playai)/.test(n)) || "llama-3.3-70b-versatile";
+      return pref.filter((p) => liste.includes(p)).concat(liste.filter((n) => !pref.includes(n) && !/(whisper|guard|tts|orpheus|playai|compound)/.test(n)));
     }
     const gratuits = liste.filter((n) => /:free$/.test(n));
     const pref = [/llama-3\.3-70b/, /gpt-oss-120b/, /deepseek-chat/, /qwen.*(72|235|32)b/, /gemma-3-27b/, /mistral-small/];
-    for (const re of pref) { const m = gratuits.find((n) => re.test(n)); if (m) return m; }
-    return gratuits[0] || "meta-llama/llama-3.3-70b-instruct:free";
+    const out = []; pref.forEach((re) => gratuits.filter((n) => re.test(n)).forEach((n) => { if (!out.includes(n)) out.push(n); }));
+    return out.concat(gratuits.filter((n) => !out.includes(n)));
   }
   /* modèles à essayer dans l'ordre si le premier est refusé (quota à 0, modèle retiré…) */
   const SECOURS = {
-    gemini: ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.0-flash-lite"],
+    gemini: ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite"],
     groq: ["llama-3.3-70b-versatile", "openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.1-8b-instant"],
     openrouter: ["meta-llama/llama-3.3-70b-instruct:free", "deepseek/deepseek-chat-v3-0324:free", "google/gemma-3-27b-it:free", "mistralai/mistral-small-3.2-24b-instruct:free"],
   };
   function candidats(f, liste, premier) {
     const out = []; const add = (m) => { if (m && !out.includes(m)) out.push(m); };
-    add(premier); add(choisir(f, liste || []));
+    add(premier); classer(f, liste || []).forEach(add);
     SECOURS[f].forEach((m) => { if (!liste || !liste.length || liste.includes(m)) add(m); });
-    return out.slice(0, 5);
+    return out.slice(0, 7);
   }
   /* traduit une erreur technique en phrase claire pour Joka */
   function expliquer(e, f) {
     const m = String((e && e.message) || e || "");
     if (e && (e.name === "TypeError" || /load failed|failed to fetch|networkerror/i.test(m))) {
-      return f === "groq" ? "Groq bloque les appels venant d'une appli web (sécurité du navigateur). Cette clé ne peut pas marcher ici : garde Gemini ou OpenRouter."
-        : "l'appel a été bloqué avant d'arriver (réseau coupé ou blocage du navigateur). Vérifie ta connexion et réessaie.";
+      return "l'appel a été bloqué avant d'arriver (réseau coupé ou blocage du navigateur). Vérifie ta connexion et réessaie.";
     }
     if (/api key not valid|invalid api key|invalid_api_key|incorrect api key|unauthorized|401/i.test(m) || (e && (e.status === 401))) return "clé refusée : recopie-la en entier, sans espace avant ou après.";
     if (e && e.status === 403) return "clé sans accès à ce service (403) : vérifie qu'elle est bien active sur le site du fournisseur.";

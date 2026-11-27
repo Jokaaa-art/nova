@@ -572,7 +572,6 @@
           <div class="champ"><label for="cv-${f}">Clé ${esc(F[f].nom.split(" ")[0])}</label><input id="cv-${f}" type="password" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" value="${esc(c.cles[f] || "")}" placeholder="Colle ta clé ici"></div>
           <p class="sous" style="margin-top:8px">${lien(F[f].cle, "Obtenir une clé gratuite")}</p><p class="sous">${[c.modeles[f] ? "Modèle : " + esc(c.modeles[f]) : "", F[f].images ? "lit les images" : "", F[f].recherche ? "cherche sur le web" : ""].filter(Boolean).join(", ")}</p>
           <div class="rangee" style="margin-top:var(--e-3)"><button class="btn" data-cv="sauver" data-f="${f}">Enregistrer</button><button class="btn" data-cv="tester" data-f="${f}">Tester</button>${c.cles[f] ? `<button class="btn danger" data-cv="effacer" data-f="${f}">Effacer la clé</button>` : ""}</div>
-          ${f === "groq" ? `<p class="sous" style="margin-top:8px">Groq bloque souvent les appels venant d'une appli web : si le test échoue, ce n'est pas ta faute, Gemini ou OpenRouter suffisent.</p>` : ""}
           <p class="sous" id="cv-r-${f}" role="status" style="margin-top:8px"></p></section>`).join("")}
         <section class="carte"><h2>Tout vérifier</h2><p class="sous">Teste toutes tes clés d'un coup et te dit laquelle marche.</p><div class="rangee" style="margin-top:12px"><button class="btn" data-cv="tout">Tester toutes mes clés</button></div><div id="cv-tout" class="liste" style="margin-top:8px"></div></section>
         <p class="sous">Ordre d'essai : le 1 d'abord, puis les autres si le premier ne répond pas. Le Labo peut changer cet ordre tout seul s'il mesure qu'un autre marche mieux chez toi (et l'annule si c'est pire).</p>`;
@@ -589,8 +588,11 @@
           for (const k of cfgT.ordre) {
             if (!cfgT.cles[k]) { lignes.push([NovaCerveau.FOURNISSEURS[k].nom, "pas de clé", ""]); continue; }
             const r = await NovaCerveau.tester(k);
-            lignes.push([NovaCerveau.FOURNISSEURS[k].nom, r.ok ? "marche (" + r.modele + ")" : r.erreur, r.ok ? "ok" : "err"]);
+            lignes.push([NovaCerveau.FOURNISSEURS[k].nom, r.ok ? "marche (" + r.modele + ")" : r.erreur + (r.essais && r.essais.length ? " Modèles essayés : " + r.essais.map((x) => x.modele).join(", ") + "." : ""), r.ok ? "ok" : "err"]);
           }
+          /* ceux qui marchent passent en premier : N.O.V.A répond plus vite */
+          const marche = cfgT.ordre.filter((k, i) => lignes[i] && lignes[i][2] === "ok");
+          if (marche.length) await NovaCerveau.regler({ ordre: marche.concat(cfgT.ordre.filter((k) => !marche.includes(k))) });
           const auto = (await NovaCerveau.config()).autorise;
           zone.innerHTML = lignes.map(([n, t, e]) => `<div class="el"><div class="t"><b>${esc(n)}</b><small${e ? ` style="color:var(--${e === "ok" ? "ok" : "crit"})"` : ""}>${esc(t)}</small></div></div>`).join("")
             + `<div class="el"><div class="t"><b>Autorisation</b><small style="color:var(--${auto ? "ok" : "warn"})">${auto ? "allumée" : "éteinte : allume « Autoriser le cerveau en ligne » en haut"}</small></div></div>`;
